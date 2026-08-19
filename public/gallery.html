@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gallery</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site">
+  <a class="brand" href="/">Book a Haircut</a>
+  <nav class="site-nav">
+    <a href="/my-bookings.html">My bookings</a>
+    <a href="/login.html">Hairdresser login</a>
+  </nav>
+</header>
+<main>
+  <h1>Gallery</h1>
+  <div id="gallery" class="gallery-grid"><p class="muted">Loading...</p></div>
+</main>
+<script src="/js/api.js"></script>
+<script>
+async function load() {
+  const el = document.getElementById('gallery');
+  try {
+    const photos = await api('GET', '/api/gallery');
+    if (photos.length === 0) {
+      el.innerHTML = '<p class="muted">No photos yet.</p>';
+      return;
+    }
+    el.innerHTML = photos.map(p => `
+      <div>
+        <img src="${p.url}" alt="${esc(p.caption)}" loading="lazy">
+        ${p.caption ? `<div class="muted">${esc(p.caption)}</div>` : ''}
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+load();
+</script>
+</body>
+</html>

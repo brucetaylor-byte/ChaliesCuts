@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book a slot</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site">
+  <a class="brand" href="/">Book a Haircut</a>
+  <nav class="site-nav">
+    <a href="/gallery.html">Gallery</a>
+    <a href="/my-bookings.html">My bookings</a>
+    <a href="/login.html">Hairdresser login</a>
+  </nav>
+</header>
+<main>
+  <div id="profile" class="card"></div>
+
+  <h2>Available slots</h2>
+  <div id="slots" class="day-list"><p class="muted">Loading...</p></div>
+
+  <div id="bookingForm" class="card" style="display:none;">
+    <h3>Request this slot</h3>
+    <p id="selectedSlotLabel" class="muted"></p>
+    <form id="form">
+      <label for="name">Your name</label>
+      <input id="name" required>
+      <label for="email">Email</label>
+      <input id="email" type="email" required>
+      <label for="note">Note for the stylist (optional)</label>
+      <textarea id="note" rows="2" placeholder="e.g. what you'd like done"></textarea>
+      <div class="row" style="margin-top:1rem;">
+        <button type="submit">Request booking</button>
+        <button type="button" class="secondary" id="cancelSelect">Cancel</button>
+      </div>
+      <p id="formMsg"></p>
+    </form>
+  </div>
+
+  <div id="confirmation" class="card" style="display:none;"></div>
+</main>
+<footer class="site">Bookings need the stylist's confirmation before they're locked in.</footer>
+<script src="/js/api.js"></script>
+<script>
+const hairdresserId = qs('id');
+let selectedSlot = null;
+
+async function loadProfile() {
+  const profileEl = document.getElementById('profile');
+  try {
+    const hd = await api('GET', `/api/hairdressers/${hairdresserId}`);
+    const socials = [
+      hd.instagram_url ? `<a href="${hd.instagram_url}" target="_blank" rel="noopener">Instagram</a>` : '',
+      hd.facebook_url ? `<a href="${hd.facebook_url}" target="_blank" rel="noopener">Facebook</a>` : '',
+      hd.tiktok_url ? `<a href="${hd.tiktok_url}" target="_blank" rel="noopener">TikTok</a>` : '',
+      hd.website_url ? `<a href="${hd.website_url}" target="_blank" rel="noopener">Website</a>` : ''
+    ].filter(Boolean).join('');
+    profileEl.innerHTML = `
+      <h1>${esc(hd.display_name)}</h1>
+      <p>${esc(hd.bio || '')}</p>
+      ${socials ? `<div class="socials">${socials}</div>` : ''}
+    `;
+  } catch (e) {
+    profileEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+async function loadSlots() {
+  const container = document.getElementById('slots');
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const slots = await api('GET', `/api/availability/hairdresser/${hairdresserId}?from=${today}`);
+    if (slots.length === 0) {
+      container.innerHTML = '<p class="muted">No upcoming availability yet - check back soon.</p>';
+      return;
+    }
+    const byDate = {};
+    for (const s of slots) {
+      (byDate[s.date] = byDate[s.date] || []).push(s);
+    }
+    container.innerHTML = Object.keys(byDate).sort().map(date => `
+      <div class="day-group">
+        <h3>${fmtDate(date)}</h3>
+        <div class="slot-grid">
+          ${byDate[date].map(s => `
+            <div class="slot ${s.status}" data-id="${s.id}" data-date="${date}" data-start="${s.start_time}">
+              ${fmtTime(s.start_time)}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.slot.open').forEach(el => {
+      el.addEventListener('click', () => selectSlot(el));
+    });
+  } catch (e) {
+    container.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+function selectSlot(el) {
+  document.querySelectorAll('.slot.selected').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedSlot = { id: el.dataset.id, date: el.dataset.date, start: el.dataset.start };
+  document.getElementById('selectedSlotLabel').textContent = `${fmtDate(selectedSlot.date)} at ${fmtTime(selectedSlot.start)}`;
+  document.getElementById('bookingForm').style.display = 'block';
+  document.getElementById('bookingForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  prefillFromSession();
+}
+
+async function prefillFromSession() {
+  try {
+    const c = await api('GET', '/api/auth/customer/me');
+    document.getElementById('name').value = c.name;
+    document.getElementById('email').value = c.email;
+  } catch (e) { /* not logged in, fine */ }
+}
+
+document.getElementById('cancelSelect').addEventListener('click', () => {
+  document.querySelectorAll('.slot.selected').forEach(s => s.classList.remove('selected'));
+  document.getElementById('bookingForm').style.display = 'none';
+  selectedSlot = null;
+});
+
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('formMsg');
+  msg.textContent = '';
+  if (!selectedSlot) return;
+  try {
+    const booking = await api('POST', '/api/bookings', {
+      slotId: selectedSlot.id,
+      customerName: document.getElementById('name').value,
+      customerEmail: document.getElementById('email').value,
+      note: document.getElementById('note').value
+    });
+    document.getElementById('bookingForm').style.display = 'none';
+    const confirmation = document.getElementById('confirmation');
+    confirmation.style.display = 'block';
+    const statusUrl = `${location.origin}/booking-status.html?token=${booking.access_token}`;
+    confirmation.innerHTML = `
+      <h3>Request sent!</h3>
+      <p>Your slot on <strong>${fmtDate(selectedSlot.date)} at ${fmtTime(selectedSlot.start)}</strong> is now pending confirmation from the stylist.</p>
+      <p>Bookmark this link to check its status or cancel later:</p>
+      <p><a href="${statusUrl}">${statusUrl}</a></p>
+    `;
+    loadSlots();
+  } catch (e2) {
+    msg.textContent = e2.message;
+    msg.className = 'error';
+    if (/just taken/i.test(e2.message)) loadSlots();
+  }
+});
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+loadProfile();
+loadSlots();
+</script>
+</body>
+</html>

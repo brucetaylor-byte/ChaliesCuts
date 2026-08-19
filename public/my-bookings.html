@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My bookings</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site">
+  <a class="brand" href="/">Book a Haircut</a>
+  <nav class="site-nav">
+    <a href="/gallery.html">Gallery</a>
+    <a href="/login.html">Hairdresser login</a>
+  </nav>
+</header>
+<main>
+  <h1>My bookings</h1>
+  <p class="muted">This is optional &mdash; you don't need an account to book. Create one here if you'd like all your bookings in one place instead of tracking separate links.</p>
+
+  <div id="authArea"></div>
+  <div id="bookingsArea"></div>
+</main>
+<script src="/js/api.js"></script>
+<script>
+let me = null;
+
+async function init() {
+  try {
+    me = await api('GET', '/api/auth/customer/me');
+    renderLoggedIn();
+    loadBookings();
+  } catch (e) {
+    renderLoggedOut();
+  }
+}
+
+function renderLoggedOut() {
+  document.getElementById('authArea').innerHTML = `
+    <div class="card">
+      <h2>Log in or create an account</h2>
+      <form id="loginForm">
+        <label for="loginEmail">Email</label>
+        <input id="loginEmail" type="email" required>
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" required>
+        <div class="row" style="margin-top:1rem;">
+          <button type="submit">Log in</button>
+        </div>
+        <p id="loginMsg"></p>
+      </form>
+      <hr style="border:none;border-top:1px solid var(--line);margin:1rem 0;">
+      <h3>New here?</h3>
+      <form id="signupForm">
+        <label for="signupName">Name</label>
+        <input id="signupName" required>
+        <label for="signupEmail">Email</label>
+        <input id="signupEmail" type="email" required>
+        <label for="signupPassword">Password</label>
+        <input id="signupPassword" type="password" required minlength="6">
+        <div class="row" style="margin-top:1rem;">
+          <button type="submit">Create account</button>
+        </div>
+        <p id="signupMsg"></p>
+      </form>
+    </div>
+  `;
+  document.getElementById('bookingsArea').innerHTML = '<p class="muted">Don\'t have an account? No worries - use the private link you were given when you booked instead.</p>';
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('loginMsg');
+    try {
+      me = await api('POST', '/api/auth/customer/login', {
+        email: document.getElementById('loginEmail').value,
+        password: document.getElementById('loginPassword').value
+      });
+      renderLoggedIn();
+      loadBookings();
+    } catch (err) {
+      msg.textContent = err.message;
+      msg.className = 'error';
+    }
+  });
+
+  document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('signupMsg');
+    try {
+      me = await api('POST', '/api/auth/customer/signup', {
+        name: document.getElementById('signupName').value,
+        email: document.getElementById('signupEmail').value,
+        password: document.getElementById('signupPassword').value
+      });
+      renderLoggedIn();
+      loadBookings();
+    } catch (err) {
+      msg.textContent = err.message;
+      msg.className = 'error';
+    }
+  });
+}
+
+function renderLoggedIn() {
+  document.getElementById('authArea').innerHTML = `
+    <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>Logged in as <strong>${esc(me.name)}</strong></span>
+      <button class="secondary" id="logoutBtn">Log out</button>
+    </div>
+  `;
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await api('POST', '/api/auth/customer/logout');
+    me = null;
+    renderLoggedOut();
+    document.getElementById('bookingsArea').innerHTML = '';
+  });
+}
+
+async function loadBookings() {
+  const el = document.getElementById('bookingsArea');
+  try {
+    const bookings = await api('GET', '/api/bookings/mine');
+    if (bookings.length === 0) {
+      el.innerHTML = '<p class="muted">No bookings yet.</p>';
+      return;
+    }
+    el.innerHTML = bookings.map(b => `
+      <div class="card">
+        <div><span class="badge ${b.status}">${b.status}</span></div>
+        <p><strong>${esc(b.hairdresser.display_name)}</strong> &mdash; ${fmtDate(b.slot.date)} at ${fmtTime(b.slot.start_time)}</p>
+        ${(b.status === 'pending' || b.status === 'approved') ? `<button class="danger" data-cancel="${b.id}">Cancel</button>` : ''}
+      </div>
+    `).join('');
+    el.querySelectorAll('[data-cancel]').forEach(btn => btn.addEventListener('click', async () => {
+      if (!confirm('Cancel this booking?')) return;
+      await api('POST', '/api/bookings/cancel', { bookingId: btn.dataset.cancel });
+      loadBookings();
+    }));
+  } catch (e) {
+    el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stylist Dashboard</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site">
+  <a class="brand" href="/">Book a Haircut</a>
+  <nav class="site-nav">
+    <a href="/gallery.html">Gallery</a>
+    <button class="secondary" id="logoutBtn">Log out</button>
+  </nav>
+</header>
+<main>
+  <h1 id="welcome">Dashboard</h1>
+
+  <div class="card">
+    <h2>Pending requests</h2>
+    <div id="pending"><p class="muted">Loading...</p></div>
+  </div>
+
+  <div class="card">
+    <h2>Add availability</h2>
+    <p class="muted">Generates half-hour open slots across the date range you pick.</p>
+    <form id="availForm">
+      <div class="row">
+        <div>
+          <label for="startDate">From date</label>
+          <input id="startDate" type="date" required>
+        </div>
+        <div>
+          <label for="endDate">To date</label>
+          <input id="endDate" type="date" required>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="startTime">Start time</label>
+          <input id="startTime" type="time" step="1800" required>
+        </div>
+        <div>
+          <label for="endTime">End time</label>
+          <input id="endTime" type="time" step="1800" required>
+        </div>
+      </div>
+      <label>Repeat on</label>
+      <div class="row" id="dayCheckboxes"></div>
+      <div style="margin-top:1rem;">
+        <button type="submit">Generate slots</button>
+      </div>
+      <p id="availMsg"></p>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>My calendar</h2>
+    <div id="myCalendar"><p class="muted">Loading...</p></div>
+  </div>
+
+  <div class="card">
+    <h2 id="otherCalendarTitle">Other stylist's calendar</h2>
+    <div id="otherCalendar"><p class="muted">Loading...</p></div>
+  </div>
+
+  <div class="card">
+    <h2>My profile</h2>
+    <form id="profileForm">
+      <label for="displayName">Display name</label>
+      <input id="displayName" required>
+      <label for="bio">Bio</label>
+      <textarea id="bio" rows="2"></textarea>
+      <label for="instagram">Instagram URL</label>
+      <input id="instagram" placeholder="https://instagram.com/...">
+      <label for="facebook">Facebook URL</label>
+      <input id="facebook" placeholder="https://facebook.com/...">
+      <label for="tiktok">TikTok URL</label>
+      <input id="tiktok" placeholder="https://tiktok.com/@...">
+      <label for="website">Website URL</label>
+      <input id="website" placeholder="https://...">
+      <div style="margin-top:1rem;">
+        <button type="submit">Save profile</button>
+      </div>
+      <p id="profileMsg"></p>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Change password</h2>
+    <form id="passwordForm">
+      <label for="currentPassword">Current password</label>
+      <input id="currentPassword" type="password" required>
+      <label for="newPassword">New password</label>
+      <input id="newPassword" type="password" required minlength="6">
+      <div style="margin-top:1rem;">
+        <button type="submit">Update password</button>
+      </div>
+      <p id="passwordMsg"></p>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Gallery - upload a photo</h2>
+    <form id="galleryForm">
+      <label for="photo">Photo</label>
+      <input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required>
+      <label for="caption">Caption (optional)</label>
+      <input id="caption">
+      <div style="margin-top:1rem;">
+        <button type="submit">Upload</button>
+      </div>
+      <p id="galleryMsg"></p>
+    </form>
+    <div id="myGallery" class="gallery-grid" style="margin-top:1rem;"></div>
+  </div>
+</main>
+<script src="/js/api.js"></script>
+<script>
+let me = null;
+let allHairdressers = [];
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+document.getElementById('dayCheckboxes').innerHTML = DAYS.map((d, i) => `
+  <label style="flex:0 0 auto; display:flex; align-items:center; gap:0.3rem; color:var(--ink);">
+    <input type="checkbox" value="${i}" checked style="width:auto;"> ${d}
+  </label>
+`).join('');
+
+async function init() {
+  try {
+    me = await api('GET', '/api/auth/hairdresser/me');
+  } catch (e) {
+    location.href = '/login.html';
+    return;
+  }
+  document.getElementById('welcome').textContent = `Hi ${me.display_name}`;
+  document.getElementById('displayName').value = me.display_name;
+  document.getElementById('bio').value = me.bio || '';
+  document.getElementById('instagram').value = me.instagram_url || '';
+  document.getElementById('facebook').value = me.facebook_url || '';
+  document.getElementById('tiktok').value = me.tiktok_url || '';
+  document.getElementById('website').value = me.website_url || '';
+
+  allHairdressers = await api('GET', '/api/hairdressers');
+
+  loadPending();
+  loadMyCalendar();
+  loadOtherCalendar();
+  loadMyGallery();
+}
+
+async function loadPending() {
+  const el = document.getElementById('pending');
+  try {
+    const bookings = await api('GET', '/api/bookings?status=pending');
+    if (bookings.length === 0) {
+      el.innerHTML = '<p class="muted">No pending requests.</p>';
+      return;
+    }
+    el.innerHTML = bookings.map(b => `
+      <div class="card">
+        <div><strong>${esc(b.customer_name)}</strong> (${esc(b.customer_email)})</div>
+        <div class="muted">${fmtDate(b.slot.date)} at ${fmtTime(b.slot.start_time)}</div>
+        ${b.note ? `<div class="muted">Note: ${esc(b.note)}</div>` : ''}
+        <div class="row" style="margin-top:0.6rem;">
+          <button data-approve="${b.id}">Approve</button>
+          <button class="danger" data-decline="${b.id}">Decline</button>
+        </div>
+      </div>
+    `).join('');
+    el.querySelectorAll('[data-approve]').forEach(btn => btn.addEventListener('click', () => decide(btn.dataset.approve, 'approve')));
+    el.querySelectorAll('[data-decline]').forEach(btn => btn.addEventListener('click', () => decide(btn.dataset.decline, 'decline')));
+  } catch (e) {
+    el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+async function decide(id, action) {
+  try {
+    await api('POST', `/api/bookings/${id}/${action}`);
+    loadPending();
+    loadMyCalendar();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+function renderCalendar(slots, readOnly) {
+  if (slots.length === 0) return '<p class="muted">No upcoming slots.</p>';
+  const byDate = {};
+  for (const s of slots) (byDate[s.date] = byDate[s.date] || []).push(s);
+  return Object.keys(byDate).sort().map(date => `
+    <div class="day-group">
+      <h3>${fmtDate(date)}</h3>
+      <div class="slot-grid">
+        ${byDate[date].map(s => `
+          <div class="slot ${s.status}" ${!readOnly && s.status === 'open' ? `data-remove="${s.id}" title="Click to remove"` : ''}>
+            ${fmtTime(s.start_time)}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadMyCalendar() {
+  const el = document.getElementById('myCalendar');
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const slots = await api('GET', `/api/availability/hairdresser/${me.id}?from=${today}`);
+    el.innerHTML = renderCalendar(slots, false);
+    el.querySelectorAll('[data-remove]').forEach(s => s.addEventListener('click', async () => {
+      if (!confirm('Remove this open slot?')) return;
+      try {
+        await api('DELETE', `/api/availability/${s.dataset.remove}`);
+        loadMyCalendar();
+      } catch (e) { alert(e.message); }
+    }));
+  } catch (e) {
+    el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+async function loadOtherCalendar() {
+  const el = document.getElementById('otherCalendar');
+  const other = allHairdressers.find(h => h.id !== me.id);
+  if (!other) {
+    document.getElementById('otherCalendarTitle').textContent = 'Other stylist\'s calendar';
+    el.innerHTML = '<p class="muted">No other stylist set up yet.</p>';
+    return;
+  }
+  document.getElementById('otherCalendarTitle').textContent = `${other.display_name}'s calendar`;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const slots = await api('GET', `/api/availability/hairdresser/${other.id}?from=${today}`);
+    el.innerHTML = renderCalendar(slots, true);
+  } catch (e) {
+    el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+document.getElementById('availForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('availMsg');
+  msg.textContent = '';
+  const daysOfWeek = Array.from(document.querySelectorAll('#dayCheckboxes input:checked')).map(cb => Number(cb.value));
+  try {
+    const result = await api('POST', '/api/availability', {
+      startDate: document.getElementById('startDate').value,
+      endDate: document.getElementById('endDate').value,
+      startTime: document.getElementById('startTime').value,
+      endTime: document.getElementById('endTime').value,
+      daysOfWeek
+    });
+    msg.textContent = `Created ${result.created} new slot(s).`;
+    msg.className = 'success';
+    loadMyCalendar();
+  } catch (err) {
+    msg.textContent = err.message;
+    msg.className = 'error';
+  }
+});
+
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('profileMsg');
+  try {
+    await api('PUT', '/api/hairdressers/me', {
+      display_name: document.getElementById('displayName').value,
+      bio: document.getElementById('bio').value,
+      instagram_url: document.getElementById('instagram').value,
+      facebook_url: document.getElementById('facebook').value,
+      tiktok_url: document.getElementById('tiktok').value,
+      website_url: document.getElementById('website').value
+    });
+    msg.textContent = 'Saved.';
+    msg.className = 'success';
+    document.getElementById('welcome').textContent = `Hi ${document.getElementById('displayName').value}`;
+  } catch (err) {
+    msg.textContent = err.message;
+    msg.className = 'error';
+  }
+});
+
+document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('passwordMsg');
+  try {
+    await api('PUT', '/api/auth/hairdresser/password', {
+      currentPassword: document.getElementById('currentPassword').value,
+      newPassword: document.getElementById('newPassword').value
+    });
+    msg.textContent = 'Password updated.';
+    msg.className = 'success';
+    e.target.reset();
+  } catch (err) {
+    msg.textContent = err.message;
+    msg.className = 'error';
+  }
+});
+
+document.getElementById('galleryForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('galleryMsg');
+  const fileInput = document.getElementById('photo');
+  if (!fileInput.files[0]) return;
+  const fd = new FormData();
+  fd.append('photo', fileInput.files[0]);
+  fd.append('caption', document.getElementById('caption').value);
+  try {
+    await api('POST', '/api/gallery', fd);
+    msg.textContent = 'Uploaded.';
+    msg.className = 'success';
+    e.target.reset();
+    loadMyGallery();
+  } catch (err) {
+    msg.textContent = err.message;
+    msg.className = 'error';
+  }
+});
+
+async function loadMyGallery() {
+  const el = document.getElementById('myGallery');
+  try {
+    const photos = await api('GET', `/api/gallery?hairdresserId=${me.id}`);
+    el.innerHTML = photos.map(p => `
+      <div>
+        <img src="${p.url}" alt="${esc(p.caption)}">
+        <button class="secondary" data-del="${p.id}" style="width:100%; margin-top:0.3rem;">Delete</button>
+      </div>
+    `).join('');
+    el.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
+      if (!confirm('Delete this photo?')) return;
+      await api('DELETE', `/api/gallery/${btn.dataset.del}`);
+      loadMyGallery();
+    }));
+  } catch (e) {
+    el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await api('POST', '/api/auth/hairdresser/logout');
+  location.href = '/';
+});
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+init();
+</script>
+</body>
+</html>

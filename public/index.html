@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book a Haircut</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="site">
+  <a class="brand" href="/">Book a Haircut</a>
+  <nav class="site-nav">
+    <a href="/gallery.html">Gallery</a>
+    <a href="/my-bookings.html">My bookings</a>
+    <a href="/login.html">Hairdresser login</a>
+  </nav>
+</header>
+<main>
+  <h1>Choose your stylist</h1>
+  <p class="muted">Pick who you'd like to book with, then choose an open half-hour slot on their calendar.</p>
+  <div id="list" class="hairdresser-list"></div>
+</main>
+<footer class="site">Bookings are requested, not instant &mdash; the stylist confirms before it's locked in.</footer>
+<script src="/js/api.js"></script>
+<script>
+async function load() {
+  const list = document.getElementById('list');
+  try {
+    const hairdressers = await api('GET', '/api/hairdressers');
+    if (hairdressers.length === 0) {
+      list.innerHTML = '<p class="muted">No stylists set up yet.</p>';
+      return;
+    }
+    list.innerHTML = hairdressers.map(hd => `
+      <a class="card hairdresser-card" href="/hairdresser.html?id=${hd.id}">
+        <div>
+          <div class="name">${escapeHtml(hd.display_name)}</div>
+          <div class="bio">${escapeHtml(hd.bio || '')}</div>
+        </div>
+        <span class="btn secondary">View calendar</span>
+      </a>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
+  }
+}
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+load();
+</script>
+</body>
+</html>
