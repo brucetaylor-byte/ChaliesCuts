@@ -29,10 +29,10 @@ approves or declines the request before it's locked in.
   `stripe_session_id` style column later if you want to add a deposit via
   Stripe Checkout - ask and I can wire that in as a follow-up once you have a
   Stripe account.
-- **No email notifications.** Status is checked via the private link sent at
-  booking time, or by logging into a customer account. Real email (e.g. via
-  Resend, Postmark, or SendGrid) can be added later without changing the data
-  model.
+- **Email notifications are optional and off by default.** Set up
+  `GMAIL_USER` / `GMAIL_APP_PASSWORD` (see "Booking confirmation emails"
+  below) to turn them on. Without that, status is still checked via the
+  private link sent at booking time, or by logging into a customer account.
 - **Sessions are stored in server memory.** Fine for one small server/single
   process. If you ever run more than one server instance behind a load
   balancer, swap in a session store like `connect-sqlite3` or Redis.
@@ -48,6 +48,25 @@ npm start
 ```
 
 Then open http://localhost:3000 in a browser.
+
+### Booking confirmation emails (optional)
+
+By default the app sends no emails - customers just get a private link to
+check their booking's status. To have the app automatically email customers
+when a booking is confirmed, declined, or cancelled, sent from your own
+Gmail account (free, no domain needed):
+
+1. Copy `.env.example` to a new file called `.env` in the project folder.
+2. Follow the instructions inside `.env.example` to create a Gmail "app
+   password" (a 16-character password just for this app - not your normal
+   Gmail login password).
+3. Fill in `GMAIL_USER` and `GMAIL_APP_PASSWORD` in `.env`.
+4. Restart the server (`npm start`).
+
+`.env` is already excluded from git, so these credentials never get
+committed or pushed to GitHub. Leave `.env` missing (or those two values
+blank) and the app runs exactly as before - emails are just skipped, nothing
+breaks.
 
 ### Default logins (change these immediately)
 
@@ -102,6 +121,47 @@ This app is intentionally boring on purpose so it's cheap to run:
   built-in dev default.
 - Back up `data/booking.db` and the `uploads/` folder periodically - that's
   the entire state of the app.
+
+## Deploying live (Railway walkthrough)
+
+Railway is the cheapest good fit for this app (see "Hosting cheaply" above).
+Rough cost: their $5/month Hobby plan, which includes $5 of usage - an app
+this small typically stays within that.
+
+1. **Push your latest code to GitHub** via GitHub Desktop (commit, then
+   push) - Railway deploys straight from your GitHub repo.
+2. **Sign up at [railway.com](https://railway.com)**, ideally using "Log in
+   with GitHub" so it can see your repos.
+3. **New Project → Deploy from GitHub repo** → pick your `ChaliesCuts` repo.
+   Railway will detect it's a Node app and deploy it automatically - it'll
+   likely fail on the first attempt, which is expected, because two things
+   still need setting up:
+4. **Add a Volume** (persistent disk) so your database and photos survive
+   future deploys instead of getting wiped each time:
+   - In the service, open the "Volumes" tab (or press `⌘K` and search
+     "volume") and create one.
+   - Set its **mount path** to `/app/storage`.
+5. **Set environment variables** on the service (a "Variables" tab):
+   - `DATA_DIR` = `/app/storage` (tells the app to use that volume - see
+     `.env.example`)
+   - `SESSION_SECRET` = any long random string (mash the keyboard)
+   - `NODE_ENV` = `production`
+   - Optionally `GMAIL_USER` / `GMAIL_APP_PASSWORD` / `EMAIL_FROM_NAME` if
+     you want booking confirmation emails live too (same values as your
+     local `.env`).
+6. **Change the service's start command** to `npm run seed && npm start`
+   (in service settings, usually under "Deploy"). This safely creates the
+   two stylist logins the very first time only - `npm run seed` skips
+   anything that already exists, so it's fine to leave this as the
+   permanent start command; it won't re-create or reset anything on later
+   deploys.
+7. **Redeploy.** Railway gives you a `*.up.railway.app` URL - open it and
+   you should see the live site. Log in with the seeded stylist credentials
+   (see "Default logins" above) and change the passwords immediately, since
+   this is now a real public URL.
+
+Once that's working, you can add a custom domain from the same dashboard if
+you want something nicer than the `*.up.railway.app` address.
 
 ## Project structure
 

@@ -8,7 +8,7 @@ function requireHairdresser(req, res, next) {
   next();
 }
 
-const PUBLIC_FIELDS = 'id, username, display_name, bio, instagram_url, facebook_url, tiktok_url, website_url';
+const PUBLIC_FIELDS = 'id, username, display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url';
 
 // Public: list both hairdressers so a customer can choose
 router.get('/', (req, res) => {
@@ -25,15 +25,16 @@ router.get('/:id', (req, res) => {
 
 // Logged-in hairdresser: update own profile / bio / socials
 router.put('/me', requireHairdresser, (req, res) => {
-  const { display_name, bio, instagram_url, facebook_url, tiktok_url, website_url } = req.body || {};
+  const { display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url } = req.body || {};
   const current = db.prepare('SELECT * FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
-  db.prepare(`UPDATE hairdressers SET display_name = ?, bio = ?, instagram_url = ?, facebook_url = ?, tiktok_url = ?, website_url = ? WHERE id = ?`)
+  db.prepare(`UPDATE hairdressers SET display_name = ?, bio = ?, instagram_url = ?, facebook_url = ?, tiktok_url = ?, snapchat_url = ?, website_url = ? WHERE id = ?`)
     .run(
       display_name ?? current.display_name,
       bio ?? current.bio,
       instagram_url ?? current.instagram_url,
       facebook_url ?? current.facebook_url,
       tiktok_url ?? current.tiktok_url,
+      snapchat_url ?? current.snapchat_url,
       website_url ?? current.website_url,
       req.session.hairdresserId
     );

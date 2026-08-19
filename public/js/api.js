@@ -35,3 +35,36 @@ function fmtTime(hhmm) {
 function qs(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
+
+// Accepts Australian mobile numbers in common written forms:
+//   0412 345 678 / 0412345678 / +61 412 345 678 / 61412345678
+// Spaces/dashes are ignored. Returns true for an empty string (field is optional).
+function isValidAuMobile(phone) {
+  const trimmed = (phone || '').trim();
+  if (!trimmed) return true;
+  const digitsAndPlus = trimmed.replace(/[\s-()]/g, '');
+  return /^(?:0|\+?61)4\d{8}$/.test(digitsAndPlus);
+}
+
+// Customer-facing pages call this once on load. If a stylist happens to be
+// logged in on this browser, it adds a "My dashboard" link to the nav so
+// they can get back to their admin screens. Otherwise it leaves an optional
+// footer login link (by element id) visible, or does nothing if there isn't one -
+// keeps "Hairdresser login" out of the way of ordinary customers.
+async function initStylistLoginState(footerLinkId) {
+  const footerLink = footerLinkId ? document.getElementById(footerLinkId) : null;
+  try {
+    await api('GET', '/api/auth/hairdresser/me');
+    const nav = document.querySelector('nav.site-nav');
+    if (nav && !nav.querySelector('[data-stylist-dashboard-link]')) {
+      const a = document.createElement('a');
+      a.href = '/dashboard.html';
+      a.textContent = 'My dashboard';
+      a.setAttribute('data-stylist-dashboard-link', '');
+      nav.appendChild(a);
+    }
+    if (footerLink) footerLink.style.display = 'none';
+  } catch (e) {
+    // Not logged in as a stylist - leave things as they are.
+  }
+}

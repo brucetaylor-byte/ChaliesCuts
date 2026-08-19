@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
@@ -27,7 +29,9 @@ app.use(session({
   }
 }));
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// See db.js for DATA_DIR - keeps this in sync with wherever uploads actually get written.
+const UPLOADS_BASE_DIR = process.env.DATA_DIR || __dirname;
+app.use('/uploads', express.static(path.join(UPLOADS_BASE_DIR, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/auth', require('./routes/auth'));

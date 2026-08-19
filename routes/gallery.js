@@ -7,7 +7,10 @@ const db = require('../db');
 
 const router = express.Router();
 
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
+// See db.js for why this respects DATA_DIR - keeps uploaded photos on the
+// same persistent volume as the database in production.
+const BASE_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
+const UPLOAD_DIR = path.join(BASE_DIR, 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);

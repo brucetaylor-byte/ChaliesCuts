@@ -4,15 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Book a slot</title>
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=7">
 </head>
 <body>
 <header class="site">
-  <a class="brand" href="/">Book a Haircut</a>
+  <a class="brand" href="/"><img src="/img/logo.png" alt="Charlie's Cuts" class="brand-logo"></a>
   <nav class="site-nav">
+    <a href="/">&larr; Back to stylists</a>
     <a href="/gallery.html">Gallery</a>
     <a href="/my-bookings.html">My bookings</a>
-    <a href="/login.html">Hairdresser login</a>
   </nav>
 </header>
 <main>
@@ -29,6 +29,8 @@
       <input id="name" required>
       <label for="email">Email</label>
       <input id="email" type="email" required>
+      <label for="phone">Mobile number (optional)</label>
+      <input id="phone" type="tel" placeholder="0412 345 678">
       <label for="note">Note for the stylist (optional)</label>
       <textarea id="note" rows="2" placeholder="e.g. what you'd like done"></textarea>
       <div class="row" style="margin-top:1rem;">
@@ -41,8 +43,8 @@
 
   <div id="confirmation" class="card" style="display:none;"></div>
 </main>
-<footer class="site">Bookings need the stylist's confirmation before they're locked in.</footer>
-<script src="/js/api.js"></script>
+<footer class="site">Bookings need the stylist's confirmation before they're locked in. &middot; <a href="/login.html" id="stylistFooterLink">Stylist login</a></footer>
+<script src="/js/api.js?v=3"></script>
 <script>
 const hairdresserId = qs('id');
 let selectedSlot = null;
@@ -55,6 +57,7 @@ async function loadProfile() {
       hd.instagram_url ? `<a href="${hd.instagram_url}" target="_blank" rel="noopener">Instagram</a>` : '',
       hd.facebook_url ? `<a href="${hd.facebook_url}" target="_blank" rel="noopener">Facebook</a>` : '',
       hd.tiktok_url ? `<a href="${hd.tiktok_url}" target="_blank" rel="noopener">TikTok</a>` : '',
+      hd.snapchat_url ? `<a href="${hd.snapchat_url}" target="_blank" rel="noopener">Snapchat</a>` : '',
       hd.website_url ? `<a href="${hd.website_url}" target="_blank" rel="noopener">Website</a>` : ''
     ].filter(Boolean).join('');
     profileEl.innerHTML = `
@@ -67,34 +70,130 @@ async function loadProfile() {
   }
 }
 
+// Weeks run Sunday-Saturday, matching the stylist's own week grouping.
+function startOfWeek(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - d.getDay());
+  return d.toISOString().slice(0, 10);
+}
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function renderDayGroups(slots) {
+  if (slots.length === 0) return '<p class="muted">Nothing open.</p>';
+  const byDate = {};
+  for (const s of slots) (byDate[s.date] = byDate[s.date] || []).push(s);
+  return Object.keys(byDate).sort().map(date => `
+    <div class="day-group">
+      <h3>${fmtDate(date)}</h3>
+      <div class="slot-grid">
+        ${byDate[date].map(s => `
+          <div class="slot ${s.status}" data-id="${s.id}" data-date="${date}" data-start="${s.start_time}">
+            ${fmtTime(s.start_time)}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function wireSlotClicks(root) {
+  root.querySelectorAll('.slot.open').forEach(el => {
+    el.addEventListener('click', () => selectSlot(el));
+  });
+}
+
+// One collapsed-by-default week row, reused for "Next week" and every week
+// beyond it - tap the header to expand and render its slots on demand.
+function renderCollapsibleWeek(label, count) {
+  return `
+    <div class="week-card">
+      <button type="button" class="week-header" aria-expanded="false">
+        <span>${label}</span>
+        <span class="week-header-meta muted">${count} open <span class="week-chevron">&#9656;</span></span>
+      </button>
+      <div class="week-body" style="display:none;"></div>
+    </div>
+  `;
+}
+
+function wireCollapsibleWeek(cardEl, slots) {
+  const btn = cardEl.querySelector('.week-header');
+  const body = cardEl.querySelector('.week-body');
+  btn.addEventListener('click', () => {
+    const willShow = body.style.display === 'none';
+    if (willShow && !body.dataset.rendered) {
+      body.innerHTML = renderDayGroups(slots);
+      body.dataset.rendered = '1';
+      wireSlotClicks(body);
+    }
+    body.style.display = willShow ? 'block' : 'none';
+    btn.setAttribute('aria-expanded', String(willShow));
+    btn.querySelector('.week-chevron').innerHTML = willShow ? '&#9662;' : '&#9656;';
+  });
+}
+
 async function loadSlots() {
   const container = document.getElementById('slots');
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const slots = await api('GET', `/api/availability/hairdresser/${hairdresserId}?from=${today}`);
-    if (slots.length === 0) {
+    const allSlots = await api('GET', `/api/availability/hairdresser/${hairdresserId}?from=${today}`);
+    // Customers only care about what they can actually book - pending/booked
+    // slots are someone else's, so they're just noise here.
+    const openSlots = allSlots.filter(s => s.status === 'open');
+
+    if (openSlots.length === 0) {
       container.innerHTML = '<p class="muted">No upcoming availability yet - check back soon.</p>';
       return;
     }
-    const byDate = {};
-    for (const s of slots) {
-      (byDate[s.date] = byDate[s.date] || []).push(s);
-    }
-    container.innerHTML = Object.keys(byDate).sort().map(date => `
-      <div class="day-group">
-        <h3>${fmtDate(date)}</h3>
-        <div class="slot-grid">
-          ${byDate[date].map(s => `
-            <div class="slot ${s.status}" data-id="${s.id}" data-date="${date}" data-start="${s.start_time}">
-              ${fmtTime(s.start_time)}
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `).join('');
 
-    container.querySelectorAll('.slot.open').forEach(el => {
-      el.addEventListener('click', () => selectSlot(el));
+    const thisWeekStart = startOfWeek(today);
+    const thisWeekEnd = addDays(thisWeekStart, 6);
+    const nextWeekStart = addDays(thisWeekStart, 7);
+    const nextWeekEnd = addDays(nextWeekStart, 6);
+
+    const thisWeekSlots = openSlots.filter(s => s.date <= thisWeekEnd);
+    const nextWeekSlots = openSlots.filter(s => s.date >= nextWeekStart && s.date <= nextWeekEnd);
+    const laterSlots = openSlots.filter(s => s.date > nextWeekEnd);
+
+    // Later weeks each get their own collapsed row, grouped by week so a
+    // customer can jump straight to the week they want instead of scrolling
+    // past everything in between.
+    const byLaterWeek = {};
+    for (const s of laterSlots) {
+      const wk = startOfWeek(s.date);
+      (byLaterWeek[wk] = byLaterWeek[wk] || []).push(s);
+    }
+    const laterWeekKeys = Object.keys(byLaterWeek).sort();
+
+    let html = `
+      <div class="card week-section">
+        <h3 class="week-section-title">This week</h3>
+        ${renderDayGroups(thisWeekSlots)}
+      </div>
+    `;
+
+    html += renderCollapsibleWeek('Next week', nextWeekSlots.length);
+
+    if (laterWeekKeys.length > 0) {
+      html += `<p class="week-later-heading muted">Later availability</p>`;
+      html += laterWeekKeys.map(wk => {
+        const weekEnd = addDays(wk, 6);
+        return renderCollapsibleWeek(`${fmtDate(wk)} &ndash; ${fmtDate(weekEnd)}`, byLaterWeek[wk].length);
+      }).join('');
+    }
+
+    container.innerHTML = html;
+
+    wireSlotClicks(container.querySelector('.week-section'));
+
+    const weekCards = container.querySelectorAll('.week-card');
+    weekCards.forEach((cardEl, i) => {
+      const slots = i === 0 ? nextWeekSlots : byLaterWeek[laterWeekKeys[i - 1]];
+      wireCollapsibleWeek(cardEl, slots);
     });
   } catch (e) {
     container.innerHTML = `<p class="error">${esc(e.message)}</p>`;
@@ -119,6 +218,17 @@ async function prefillFromSession() {
   } catch (e) { /* not logged in, fine */ }
 }
 
+document.getElementById('phone').addEventListener('blur', () => {
+  const val = document.getElementById('phone').value;
+  const msg = document.getElementById('formMsg');
+  if (val && !isValidAuMobile(val)) {
+    msg.textContent = 'That doesn\'t look like a valid Australian mobile number (e.g. 0412 345 678).';
+    msg.className = 'error';
+  } else if (msg.textContent.includes('mobile number')) {
+    msg.textContent = '';
+  }
+});
+
 document.getElementById('cancelSelect').addEventListener('click', () => {
   document.querySelectorAll('.slot.selected').forEach(s => s.classList.remove('selected'));
   document.getElementById('bookingForm').style.display = 'none';
@@ -130,11 +240,18 @@ document.getElementById('form').addEventListener('submit', async (e) => {
   const msg = document.getElementById('formMsg');
   msg.textContent = '';
   if (!selectedSlot) return;
+  const phone = document.getElementById('phone').value;
+  if (phone && !isValidAuMobile(phone)) {
+    msg.textContent = 'That doesn\'t look like a valid Australian mobile number (e.g. 0412 345 678).';
+    msg.className = 'error';
+    return;
+  }
   try {
     const booking = await api('POST', '/api/bookings', {
       slotId: selectedSlot.id,
       customerName: document.getElementById('name').value,
       customerEmail: document.getElementById('email').value,
+      customerPhone: phone,
       note: document.getElementById('note').value
     });
     document.getElementById('bookingForm').style.display = 'none';
@@ -163,6 +280,7 @@ function esc(str) {
 
 loadProfile();
 loadSlots();
+initStylistLoginState('stylistFooterLink');
 </script>
 </body>
 </html>

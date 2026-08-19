@@ -1,13 +1,15 @@
 :root {
-  --bg: #faf7f2;
-  --ink: #2b2620;
-  --muted: #7a7168;
-  --line: #e4ddd2;
-  --accent: #b5651d;
+  /* Subtle palette that echoes the Charlie's Cuts logo (deep indigo frame,
+     teal/cyan, magenta/pink, warm amber) without the neon intensity. */
+  --bg: #faf9f6;
+  --ink: #211d33;
+  --muted: #6e6580;
+  --line: #e6e1ee;
+  --accent: #147d82;
   --accent-ink: #ffffff;
-  --open: #2f7d3c;
-  --pending: #b58900;
-  --booked: #9a2f2f;
+  --open: #2f9e6e;
+  --pending: #c07f2b;
+  --booked: #ac3768;
   --radius: 10px;
   --max-width: 720px;
 }
@@ -25,26 +27,81 @@ body {
 a { color: var(--accent); }
 
 header.site {
-  padding: 1rem 1.25rem;
+  position: relative;
+  padding: 1.25rem 1.25rem 1rem;
   border-bottom: 1px solid var(--line);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
 }
+
+.stylist-icon-btn {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  z-index: 10;
+}
+.stylist-icon-btn svg { fill: currentColor; }
+.stylist-icon-btn:hover { color: var(--ink); border-color: var(--muted); }
+
+.stylist-menu {
+  position: absolute;
+  top: 3.4rem;
+  right: 0.9rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+  overflow: hidden;
+}
+.stylist-menu a {
+  display: block;
+  padding: 0.6rem 1rem;
+  white-space: nowrap;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.stylist-menu a:hover { background: var(--bg); }
 
 header.site .brand {
   font-weight: 700;
   font-size: 1.1rem;
   text-decoration: none;
   color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.brand-logo {
+  width: 80vw;
+  max-width: 900px;
+  height: auto;
+  display: block;
 }
 
 nav.site-nav {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  justify-content: center;
   font-size: 0.95rem;
 }
 
@@ -123,7 +180,109 @@ form .row {
 }
 form .row > * { flex: 1; min-width: 130px; }
 
+.blk-days {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.day-toggle {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.5rem 0.1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-family: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.day-toggle.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.block-tile {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+}
+
+.block-tile-info { display: flex; flex-direction: column; gap: 0.15rem; }
+.block-tile-remove { flex-shrink: 0; padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+
+.week-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+}
+
+.week-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+}
+
+.week-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 400;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.week-chevron { font-size: 0.75rem; }
+
+.week-body {
+  padding: 0 0.85rem 0.85rem;
+  border-top: 1px solid var(--line);
+}
+.week-body .day-group { margin-top: 0.75rem; }
+
+.week-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.week-actions button { flex: 1; min-width: 140px; font-size: 0.85rem; padding: 0.5rem 0.6rem; }
+
 .day-list { display: flex; flex-direction: column; gap: 0.9rem; }
+
+.week-section-title {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.3rem;
+}
+
+.week-later-heading {
+  margin: 0.4rem 0 -0.15rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
 
 .day-group h3 {
   margin: 0 0 0.4rem;
@@ -151,7 +310,10 @@ form .row > * { flex: 1; min-width: 130px; }
 .slot.pending { border-color: var(--pending); color: var(--pending); cursor: not-allowed; opacity: 0.7; }
 .slot.booked { border-color: var(--booked); color: var(--booked); cursor: not-allowed; opacity: 0.55; }
 .slot.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
-.slot[disabled], .slot.pending, .slot.booked { pointer-events: none; }
+/* Pending/booked slots are inert on the public booking page and the read-only "other
+   stylist" calendar, but stay clickable on a stylist's own calendar (see .clickable). */
+.slot[disabled]:not(.clickable), .slot.pending:not(.clickable), .slot.booked:not(.clickable) { pointer-events: none; }
+.slot.pending.clickable, .slot.booked.clickable { cursor: pointer; opacity: 0.85; }
 
 .badge {
   display: inline-block;
@@ -195,3 +357,88 @@ footer.site {
 @media (max-width: 480px) {
   .slot-grid { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
 }
+
+.slot.clickable { cursor: pointer; }
+
+/* ---------- Stylist dashboard: bottom tab bar + screens ---------- */
+.dash-screen { display: none; }
+.dash-screen.active { display: block; }
+
+body.has-bottom-nav main { padding-bottom: 5rem; }
+
+.bottom-tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: 60;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.bottom-tabs button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  background: none;
+  border: none;
+  padding: 0.55rem 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.bottom-tabs button .tab-icon { font-size: 1.3rem; line-height: 1; }
+
+.bottom-tabs button.active { color: var(--accent); font-weight: 600; }
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.segmented button {
+  flex: 1;
+  padding: 0.55rem 0.5rem;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.segmented button.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 29, 51, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  max-width: 420px;
+  width: 100%;
+  margin-top: 2rem;
+}
+
+.modal-box h3 { margin-top: 0; }

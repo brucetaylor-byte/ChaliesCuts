@@ -4,21 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gallery</title>
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=7">
 </head>
 <body>
 <header class="site">
-  <a class="brand" href="/">Book a Haircut</a>
+  <a class="brand" href="/"><img src="/img/logo.png" alt="Charlie's Cuts" class="brand-logo"></a>
   <nav class="site-nav">
+    <a href="/">&larr; Home</a>
     <a href="/my-bookings.html">My bookings</a>
-    <a href="/login.html">Hairdresser login</a>
   </nav>
 </header>
 <main>
   <h1>Gallery</h1>
   <div id="gallery" class="gallery-grid"><p class="muted">Loading...</p></div>
 </main>
-<script src="/js/api.js"></script>
+<footer class="site"><a href="/login.html" id="stylistFooterLink">Stylist login</a></footer>
+<script src="/js/api.js?v=3"></script>
 <script>
 async function load() {
   const el = document.getElementById('gallery');
@@ -44,6 +45,7 @@ function esc(str) {
   return div.innerHTML;
 }
 load();
+initStylistLoginState('stylistFooterLink');
 </script>
 </body>
 </html>

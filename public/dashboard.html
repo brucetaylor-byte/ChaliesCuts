@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stylist Dashboard</title>
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=7">
 </head>
-<body>
+<body class="has-bottom-nav">
 <header class="site">
-  <a class="brand" href="/">Book a Haircut</a>
+  <a class="brand" href="/"><img src="/img/logo.png" alt="Charlie's Cuts" class="brand-logo"></a>
   <nav class="site-nav">
     <a href="/gallery.html">Gallery</a>
     <button class="secondary" id="logoutBtn">Log out</button>
@@ -17,116 +17,254 @@
 <main>
   <h1 id="welcome">Dashboard</h1>
 
-  <div class="card">
-    <h2>Pending requests</h2>
-    <div id="pending"><p class="muted">Loading...</p></div>
-  </div>
+  <section class="dash-screen active" data-screen="bookings">
+    <div class="card">
+      <h2>Pending requests</h2>
+      <div id="pending"><p class="muted">Loading...</p></div>
+    </div>
 
-  <div class="card">
-    <h2>Add availability</h2>
-    <p class="muted">Generates half-hour open slots across the date range you pick.</p>
-    <form id="availForm">
-      <div class="row">
-        <div>
-          <label for="startDate">From date</label>
-          <input id="startDate" type="date" required>
-        </div>
-        <div>
-          <label for="endDate">To date</label>
-          <input id="endDate" type="date" required>
-        </div>
+    <div class="card">
+      <h2>Upcoming bookings</h2>
+      <p class="muted">Everyone booked in from today onward - confirmed or still awaiting your approval.</p>
+      <div id="upcomingBookings"><p class="muted">Loading...</p></div>
+    </div>
+  </section>
+
+  <section class="dash-screen" data-screen="calendar">
+    <div class="card">
+      <div class="segmented" id="calendarToggle">
+        <button type="button" class="active" data-cal="mine">My calendar</button>
+        <button type="button" id="otherCalBtn" data-cal="other">Other stylist</button>
       </div>
-      <div class="row">
-        <div>
-          <label for="startTime">Start time</label>
-          <input id="startTime" type="time" step="1800" required>
-        </div>
-        <div>
-          <label for="endTime">End time</label>
-          <input id="endTime" type="time" step="1800" required>
-        </div>
+      <div id="myCalendar"><p class="muted">Loading...</p></div>
+      <div id="otherCalendar" style="display:none;"><p class="muted">Loading...</p></div>
+    </div>
+  </section>
+
+  <section class="dash-screen" data-screen="availability">
+    <div class="card">
+      <h2>Add availability</h2>
+      <p class="muted">Your hours can differ day to day - add a block for each pattern (e.g. "Mon/Wed 9am-12pm" plus a separate block for "Fri 1pm-5pm"), then generate them all at once.</p>
+      <div id="availBlocks"></div>
+      <div class="row" style="margin-top:0.75rem;">
+        <button type="button" class="secondary" id="addBlockBtn">+ Add another block</button>
       </div>
-      <label>Repeat on</label>
-      <div class="row" id="dayCheckboxes"></div>
-      <div style="margin-top:1rem;">
-        <button type="submit">Generate slots</button>
+      <div class="row" style="margin-top:1rem;">
+        <button type="button" id="generateBtn">Generate slots</button>
       </div>
       <p id="availMsg"></p>
-    </form>
-  </div>
+    </div>
 
-  <div class="card">
-    <h2>My calendar</h2>
-    <div id="myCalendar"><p class="muted">Loading...</p></div>
-  </div>
+    <div class="card">
+      <h2>Your availability</h2>
+      <p class="muted">Grouped by week. Tap a week to open it and manage individual slots - approve, decline, cancel, book manually, or remove an open one.</p>
+      <div id="availabilityWeeks"><p class="muted">Loading...</p></div>
+    </div>
+  </section>
 
-  <div class="card">
-    <h2 id="otherCalendarTitle">Other stylist's calendar</h2>
-    <div id="otherCalendar"><p class="muted">Loading...</p></div>
-  </div>
+  <section class="dash-screen" data-screen="profile">
+    <div class="card">
+      <h2>My profile</h2>
+      <form id="profileForm">
+        <label for="displayName">Display name</label>
+        <input id="displayName" required>
+        <label for="bio">Bio</label>
+        <textarea id="bio" rows="2"></textarea>
+        <label for="instagram">Instagram URL</label>
+        <input id="instagram" placeholder="https://instagram.com/...">
+        <label for="facebook">Facebook URL</label>
+        <input id="facebook" placeholder="https://facebook.com/...">
+        <label for="tiktok">TikTok URL</label>
+        <input id="tiktok" placeholder="https://tiktok.com/@...">
+        <label for="snapchat">Snapchat URL</label>
+        <input id="snapchat" placeholder="https://snapchat.com/add/...">
+        <label for="website">Website URL</label>
+        <input id="website" placeholder="https://...">
+        <div style="margin-top:1rem;">
+          <button type="submit">Save profile</button>
+        </div>
+        <p id="profileMsg"></p>
+      </form>
+    </div>
 
-  <div class="card">
-    <h2>My profile</h2>
-    <form id="profileForm">
-      <label for="displayName">Display name</label>
-      <input id="displayName" required>
-      <label for="bio">Bio</label>
-      <textarea id="bio" rows="2"></textarea>
-      <label for="instagram">Instagram URL</label>
-      <input id="instagram" placeholder="https://instagram.com/...">
-      <label for="facebook">Facebook URL</label>
-      <input id="facebook" placeholder="https://facebook.com/...">
-      <label for="tiktok">TikTok URL</label>
-      <input id="tiktok" placeholder="https://tiktok.com/@...">
-      <label for="website">Website URL</label>
-      <input id="website" placeholder="https://...">
-      <div style="margin-top:1rem;">
-        <button type="submit">Save profile</button>
-      </div>
-      <p id="profileMsg"></p>
-    </form>
-  </div>
+    <div class="card">
+      <h2>Change password</h2>
+      <form id="passwordForm">
+        <label for="currentPassword">Current password</label>
+        <input id="currentPassword" type="password" required>
+        <label for="newPassword">New password</label>
+        <input id="newPassword" type="password" required minlength="6">
+        <div style="margin-top:1rem;">
+          <button type="submit">Update password</button>
+        </div>
+        <p id="passwordMsg"></p>
+      </form>
+    </div>
 
-  <div class="card">
-    <h2>Change password</h2>
-    <form id="passwordForm">
-      <label for="currentPassword">Current password</label>
-      <input id="currentPassword" type="password" required>
-      <label for="newPassword">New password</label>
-      <input id="newPassword" type="password" required minlength="6">
-      <div style="margin-top:1rem;">
-        <button type="submit">Update password</button>
-      </div>
-      <p id="passwordMsg"></p>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>Gallery - upload a photo</h2>
-    <form id="galleryForm">
-      <label for="photo">Photo</label>
-      <input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required>
-      <label for="caption">Caption (optional)</label>
-      <input id="caption">
-      <div style="margin-top:1rem;">
-        <button type="submit">Upload</button>
-      </div>
-      <p id="galleryMsg"></p>
-    </form>
-    <div id="myGallery" class="gallery-grid" style="margin-top:1rem;"></div>
-  </div>
+    <div class="card">
+      <h2>Gallery - upload a photo</h2>
+      <form id="galleryForm">
+        <label for="photo">Photo</label>
+        <input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required>
+        <label for="caption">Caption (optional)</label>
+        <input id="caption">
+        <div style="margin-top:1rem;">
+          <button type="submit">Upload</button>
+        </div>
+        <p id="galleryMsg"></p>
+      </form>
+      <div id="myGallery" class="gallery-grid" style="margin-top:1rem;"></div>
+    </div>
+  </section>
 </main>
-<script src="/js/api.js"></script>
+
+<nav class="bottom-tabs">
+  <button type="button" class="active" data-tab="bookings"><span class="tab-icon">📋</span>Bookings</button>
+  <button type="button" data-tab="calendar"><span class="tab-icon">📅</span>Calendar</button>
+  <button type="button" data-tab="availability"><span class="tab-icon">➕</span>Availability</button>
+  <button type="button" data-tab="profile"><span class="tab-icon">👤</span>Profile</button>
+</nav>
+
+<div id="slotModalOverlay" class="modal-overlay" style="display:none;">
+  <div class="modal-box" id="slotModalBox"></div>
+</div>
+
+<script src="/js/api.js?v=3"></script>
 <script>
 let me = null;
 let allHairdressers = [];
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-document.getElementById('dayCheckboxes').innerHTML = DAYS.map((d, i) => `
-  <label style="flex:0 0 auto; display:flex; align-items:center; gap:0.3rem; color:var(--ink);">
-    <input type="checkbox" value="${i}" checked style="width:auto;"> ${d}
-  </label>
-`).join('');
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+let blockCounter = 0;
+let expandedWeekKey = null; // which week (by its Sunday date) is currently expanded in "Your availability"
+
+// ---------- Bottom-tab screen switching ----------
+function showScreen(name) {
+  document.querySelectorAll('.dash-screen').forEach(s => s.classList.toggle('active', s.dataset.screen === name));
+  document.querySelectorAll('.bottom-tabs [data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('.bottom-tabs [data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => showScreen(btn.dataset.tab));
+});
+
+// ---------- My calendar / other stylist's calendar toggle ----------
+document.querySelectorAll('#calendarToggle [data-cal]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#calendarToggle [data-cal]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('myCalendar').style.display = btn.dataset.cal === 'mine' ? 'block' : 'none';
+    document.getElementById('otherCalendar').style.display = btn.dataset.cal === 'other' ? 'block' : 'none';
+  });
+});
+
+// Half-hour-only time options, limited to a 9am-9pm working day - there's
+// no need to scroll through the middle of the night to book a haircut.
+function timeSelectOptions(selectedMins) {
+  let html = '';
+  for (let mins = 9 * 60; mins <= 21 * 60; mins += 30) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const value = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    const label = `${h12}:${m.toString().padStart(2, '0')} ${period}`;
+    html += `<option value="${value}"${mins === selectedMins ? ' selected' : ''}>${label}</option>`;
+  }
+  return html;
+}
+
+function addAvailBlock() {
+  const index = blockCounter++;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'card';
+  wrapper.dataset.blockIndex = index;
+  wrapper.style.marginBottom = '0.75rem';
+  wrapper.innerHTML = `
+    <div class="row">
+      <div>
+        <label>From date</label>
+        <input type="date" class="blk-startDate" required>
+      </div>
+      <div>
+        <label>To date</label>
+        <input type="date" class="blk-endDate" required>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Start time</label>
+        <select class="blk-startTime" required>${timeSelectOptions(9 * 60)}</select>
+      </div>
+      <div>
+        <label>End time</label>
+        <select class="blk-endTime" required>${timeSelectOptions(17 * 60)}</select>
+      </div>
+    </div>
+    <label>Available days</label>
+    <div class="blk-days">
+      ${DAY_LABELS.map((label, i) => `
+        <button type="button" class="day-toggle active" data-day="${i}">${label}</button>
+      `).join('')}
+    </div>
+  `;
+  wrapper.querySelectorAll('.day-toggle').forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('active'));
+  });
+  document.getElementById('availBlocks').appendChild(wrapper);
+}
+
+document.getElementById('addBlockBtn').addEventListener('click', () => addAvailBlock());
+addAvailBlock(); // start with one block
+
+function readBlockFields(blockEl) {
+  const startDate = blockEl.querySelector('.blk-startDate').value;
+  const endDate = blockEl.querySelector('.blk-endDate').value;
+  const startTime = blockEl.querySelector('.blk-startTime').value;
+  const endTime = blockEl.querySelector('.blk-endTime').value;
+  const daysOfWeek = Array.from(blockEl.querySelectorAll('.day-toggle.active')).map(b => Number(b.dataset.day));
+  if (!startDate || !endDate || !startTime || !endTime) return null;
+  return { startDate, endDate, startTime, endTime, daysOfWeek };
+}
+
+document.getElementById('generateBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('availMsg');
+  msg.textContent = '';
+  msg.className = '';
+  const blocks = Array.from(document.querySelectorAll('#availBlocks > .card'));
+
+  let totalCreated = 0;
+  let usedBlocks = 0;
+  const errors = [];
+  for (const blockEl of blocks) {
+    // A completely untouched block (no dates entered at all) is just an
+    // unused spare row, not a mistake - skip it quietly rather than
+    // reporting a "needs a from/to date" error alongside a real success.
+    const untouched = !blockEl.querySelector('.blk-startDate').value && !blockEl.querySelector('.blk-endDate').value;
+    if (untouched && blocks.length > 1) continue;
+
+    const payload = readBlockFields(blockEl);
+    if (!payload) {
+      errors.push('Every block needs a from/to date and start/end time.');
+      continue;
+    }
+    usedBlocks++;
+    try {
+      const result = await api('POST', '/api/availability', payload);
+      totalCreated += result.created;
+    } catch (err) {
+      errors.push(err.message);
+    }
+  }
+  if (errors.length > 0) {
+    msg.textContent = `Created ${totalCreated} slot(s), but hit ${errors.length} problem(s): ${errors.join(' | ')}`;
+    msg.className = 'error';
+  } else {
+    msg.textContent = `Created ${totalCreated} new slot(s) across ${usedBlocks} block(s).`;
+    msg.className = 'success';
+  }
+  loadMyCalendar();
+});
 
 async function init() {
   try {
@@ -141,14 +279,51 @@ async function init() {
   document.getElementById('instagram').value = me.instagram_url || '';
   document.getElementById('facebook').value = me.facebook_url || '';
   document.getElementById('tiktok').value = me.tiktok_url || '';
+  document.getElementById('snapchat').value = me.snapchat_url || '';
   document.getElementById('website').value = me.website_url || '';
 
   allHairdressers = await api('GET', '/api/hairdressers');
 
   loadPending();
+  loadUpcomingBookings();
   loadMyCalendar();
   loadOtherCalendar();
   loadMyGallery();
+}
+
+async function loadUpcomingBookings() {
+  const el = document.getElementById('upcomingBookings');
+  try {
+    const bookings = await api('GET', '/api/bookings');
+    const today = new Date().toISOString().slice(0, 10);
+    const relevant = bookings.filter(b =>
+      (b.status === 'pending' || b.status === 'approved') && b.slot && b.slot.date >= today
+    );
+    relevant.sort((a, b) => (a.slot.date + a.slot.start_time).localeCompare(b.slot.date + b.slot.start_time));
+    if (relevant.length === 0) {
+      el.innerHTML = '<p class="muted">No upcoming bookings yet.</p>';
+      return;
+    }
+    el.innerHTML = relevant.map(b => `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:0.5rem; flex-wrap:wrap;">
+          <strong>${fmtDate(b.slot.date)} at ${fmtTime(b.slot.start_time)}</strong>
+          <span class="badge ${b.status}">${b.status}</span>
+        </div>
+        <div>${contactLine(b)}</div>
+        ${b.note ? `<div class="muted">Note: ${esc(b.note)}</div>` : ''}
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+function contactLine(b) {
+  const parts = [`<strong>${esc(b.customer_name)}</strong>`];
+  const details = [b.customer_email, b.customer_phone].filter(Boolean).map(esc);
+  if (details.length) parts.push(`(${details.join(', ')})`);
+  return parts.join(' ');
 }
 
 async function loadPending() {
@@ -161,7 +336,7 @@ async function loadPending() {
     }
     el.innerHTML = bookings.map(b => `
       <div class="card">
-        <div><strong>${esc(b.customer_name)}</strong> (${esc(b.customer_email)})</div>
+        <div>${contactLine(b)}</div>
         <div class="muted">${fmtDate(b.slot.date)} at ${fmtTime(b.slot.start_time)}</div>
         ${b.note ? `<div class="muted">Note: ${esc(b.note)}</div>` : ''}
         <div class="row" style="margin-top:0.6rem;">
@@ -181,6 +356,7 @@ async function decide(id, action) {
   try {
     await api('POST', `/api/bookings/${id}/${action}`);
     loadPending();
+    loadUpcomingBookings();
     loadMyCalendar();
   } catch (e) {
     alert(e.message);
@@ -196,7 +372,7 @@ function renderCalendar(slots, readOnly) {
       <h3>${fmtDate(date)}</h3>
       <div class="slot-grid">
         ${byDate[date].map(s => `
-          <div class="slot ${s.status}" ${!readOnly && s.status === 'open' ? `data-remove="${s.id}" title="Click to remove"` : ''}>
+          <div class="slot ${s.status} ${!readOnly ? 'clickable' : ''}" ${!readOnly ? `data-slot-id="${s.id}" data-status="${s.status}" data-date="${date}" data-start="${s.start_time}" title="Click for options"` : ''}>
             ${fmtTime(s.start_time)}
           </div>
         `).join('')}
@@ -211,27 +387,273 @@ async function loadMyCalendar() {
     const today = new Date().toISOString().slice(0, 10);
     const slots = await api('GET', `/api/availability/hairdresser/${me.id}?from=${today}`);
     el.innerHTML = renderCalendar(slots, false);
-    el.querySelectorAll('[data-remove]').forEach(s => s.addEventListener('click', async () => {
-      if (!confirm('Remove this open slot?')) return;
-      try {
-        await api('DELETE', `/api/availability/${s.dataset.remove}`);
-        loadMyCalendar();
-      } catch (e) { alert(e.message); }
+    el.querySelectorAll('.slot.clickable').forEach(s => s.addEventListener('click', () => {
+      openSlotModal(s.dataset.slotId, s.dataset.status, s.dataset.date, s.dataset.start);
     }));
+    renderWeeksList(slots);
   } catch (e) {
     el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    const weeksEl = document.getElementById('availabilityWeeks');
+    if (weeksEl) weeksEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
   }
+}
+
+// ---------- "Your availability" - grouped by calendar week, expand to manage slots ----------
+function startOfWeek(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - d.getDay()); // back up to the Sunday that starts this week
+  return d.toISOString().slice(0, 10);
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function renderWeeksList(slots) {
+  const el = document.getElementById('availabilityWeeks');
+  if (!el) return;
+  if (slots.length === 0) {
+    el.innerHTML = '<p class="muted">No upcoming availability - add some above.</p>';
+    return;
+  }
+  const byWeek = {};
+  for (const s of slots) {
+    const wk = startOfWeek(s.date);
+    (byWeek[wk] = byWeek[wk] || []).push(s);
+  }
+  const weekKeys = Object.keys(byWeek).sort();
+  el.innerHTML = weekKeys.map(wk => {
+    const weekSlots = byWeek[wk];
+    const weekEnd = addDays(wk, 6);
+    const openCount = weekSlots.filter(s => s.status === 'open').length;
+    const bookedCount = weekSlots.length - openCount;
+    const isOpen = wk === expandedWeekKey;
+    return `
+      <div class="week-card">
+        <button type="button" class="week-header" data-week="${wk}" aria-expanded="${isOpen}">
+          <span>${fmtDate(wk)} &ndash; ${fmtDate(weekEnd)}</span>
+          <span class="week-header-meta muted">${openCount} open &middot; ${bookedCount} booked <span class="week-chevron">${isOpen ? '▾' : '▸'}</span></span>
+        </button>
+        <div class="week-body" style="display:${isOpen ? 'block' : 'none'};">
+          ${isOpen ? `
+            <div class="week-actions">
+              <button type="button" class="secondary week-add-btn" data-week-start="${wk}" data-week-end="${weekEnd}">+ Add slots this week</button>
+              ${openCount > 0 ? `<button type="button" class="danger week-remove-btn" data-week="${wk}">Remove all open (${openCount})</button>` : ''}
+            </div>
+            ${renderCalendar(weekSlots, false)}
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  el.querySelectorAll('.week-header').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const wk = btn.dataset.week;
+      expandedWeekKey = (expandedWeekKey === wk) ? null : wk;
+      renderWeeksList(slots);
+    });
+  });
+  el.querySelectorAll('.week-body .slot.clickable').forEach(s => s.addEventListener('click', () => {
+    openSlotModal(s.dataset.slotId, s.dataset.status, s.dataset.date, s.dataset.start);
+  }));
+  el.querySelectorAll('.week-add-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      addAvailBlockForWeek(btn.dataset.weekStart, btn.dataset.weekEnd);
+    });
+  });
+  el.querySelectorAll('.week-remove-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeAllOpenInWeek(byWeek[btn.dataset.week]);
+    });
+  });
+}
+
+// Prefills a fresh "Add availability" block with a given week's date range,
+// so tapping "+ Add slots this week" doesn't mean re-typing dates by hand -
+// just adjust times/days and generate.
+function addAvailBlockForWeek(weekStart, weekEnd) {
+  // Drop any other blocks nobody has touched yet (e.g. the empty default
+  // block already sitting in the form) before adding this one - otherwise
+  // "Generate slots" tries to submit that untouched block too and reports a
+  // spurious "needs a from/to date" error alongside the real success.
+  document.querySelectorAll('#availBlocks > .card').forEach(card => {
+    const untouched = !card.querySelector('.blk-startDate').value && !card.querySelector('.blk-endDate').value;
+    if (untouched) card.remove();
+  });
+  addAvailBlock();
+  const wrapper = document.getElementById('availBlocks').lastElementChild;
+  wrapper.querySelector('.blk-startDate').value = weekStart;
+  wrapper.querySelector('.blk-endDate').value = weekEnd;
+  const msg = document.getElementById('availMsg');
+  msg.textContent = `New block prefilled for ${fmtDate(weekStart)} - ${fmtDate(weekEnd)}. Adjust the times/days below, then tap "Generate slots".`;
+  msg.className = '';
+  wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function removeAllOpenInWeek(weekSlots) {
+  const openIds = weekSlots.filter(s => s.status === 'open').map(s => s.id);
+  if (openIds.length === 0) return;
+  if (!confirm(`Remove all ${openIds.length} open slot(s) this week? Anything already booked or pending is left alone.`)) return;
+  try {
+    await Promise.all(openIds.map(id => api('DELETE', `/api/availability/${id}`)));
+    const msg = document.getElementById('availMsg');
+    msg.textContent = `Removed ${openIds.length} open slot(s).`;
+    msg.className = 'success';
+    loadMyCalendar();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+function closeSlotModal() {
+  document.getElementById('slotModalOverlay').style.display = 'none';
+  document.getElementById('slotModalBox').innerHTML = '';
+}
+
+document.getElementById('slotModalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'slotModalOverlay') closeSlotModal();
+});
+
+function refreshAfterSlotChange() {
+  loadPending();
+  loadUpcomingBookings();
+  loadMyCalendar();
+}
+
+async function openSlotModal(slotId, status, date, startTime) {
+  const overlay = document.getElementById('slotModalOverlay');
+  const box = document.getElementById('slotModalBox');
+  const whenLabel = `${fmtDate(date)} at ${fmtTime(startTime)}`;
+
+  if (status === 'open') {
+    box.innerHTML = `
+      <h3>${whenLabel}</h3>
+      <p class="muted">This slot is open. Book it directly if someone's arranged a haircut over the phone or in person.</p>
+      <form id="manualBookForm">
+        <label for="manualName">Customer name</label>
+        <input id="manualName" required>
+        <label for="manualEmail">Email (optional)</label>
+        <input id="manualEmail" type="email">
+        <label for="manualPhone">Mobile number (optional)</label>
+        <input id="manualPhone" type="tel" placeholder="0412 345 678">
+        <label for="manualNote">Note (optional)</label>
+        <textarea id="manualNote" rows="2"></textarea>
+        <div class="row" style="margin-top:1rem;">
+          <button type="submit">Book this slot</button>
+          <button type="button" class="secondary" id="modalCancelBtn">Close</button>
+        </div>
+        <p id="manualMsg"></p>
+      </form>
+      <div style="margin-top:0.75rem; border-top:1px solid var(--line); padding-top:0.75rem;">
+        <button type="button" class="danger" id="modalRemoveSlotBtn">Remove this slot instead</button>
+      </div>
+    `;
+    document.getElementById('modalCancelBtn').addEventListener('click', closeSlotModal);
+    document.getElementById('modalRemoveSlotBtn').addEventListener('click', async () => {
+      if (!confirm('Remove this open slot?')) return;
+      try {
+        await api('DELETE', `/api/availability/${slotId}`);
+        closeSlotModal();
+        refreshAfterSlotChange();
+      } catch (e) { alert(e.message); }
+    });
+    document.getElementById('manualBookForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('manualMsg');
+      const phone = document.getElementById('manualPhone').value;
+      if (phone && !isValidAuMobile(phone)) {
+        msg.textContent = 'That doesn\'t look like a valid Australian mobile number (e.g. 0412 345 678).';
+        msg.className = 'error';
+        return;
+      }
+      try {
+        await api('POST', '/api/bookings/manual', {
+          slotId,
+          customerName: document.getElementById('manualName').value,
+          customerEmail: document.getElementById('manualEmail').value,
+          customerPhone: phone,
+          note: document.getElementById('manualNote').value
+        });
+        closeSlotModal();
+        refreshAfterSlotChange();
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = 'error';
+      }
+    });
+  } else {
+    // pending or booked (approved) - look up who it's for.
+    box.innerHTML = `<h3>${whenLabel}</h3><p class="muted">Loading booking details...</p>`;
+    try {
+      const b = await api('GET', `/api/bookings/slot/${slotId}`);
+      const actions = [];
+      if (b.status === 'pending') {
+        actions.push(`<button data-modal-approve="${b.id}">Approve</button>`);
+        actions.push(`<button class="danger" data-modal-decline="${b.id}">Decline</button>`);
+      } else if (b.status === 'approved') {
+        actions.push(`<button class="danger" data-modal-cancelbooking="${b.id}">Cancel booking</button>`);
+      }
+      box.innerHTML = `
+        <h3>${whenLabel}</h3>
+        <div><span class="badge ${b.status}">${b.status}</span></div>
+        <p>${contactLine(b)}</p>
+        ${b.note ? `<p class="muted">Note: ${esc(b.note)}</p>` : ''}
+        <div class="row" style="margin-top:1rem;">
+          ${actions.join('')}
+          <button type="button" class="secondary" id="modalCancelBtn">Close</button>
+        </div>
+        <p id="manualMsg"></p>
+      `;
+      document.getElementById('modalCancelBtn').addEventListener('click', closeSlotModal);
+      const approveBtn = box.querySelector('[data-modal-approve]');
+      if (approveBtn) approveBtn.addEventListener('click', async () => {
+        try {
+          await api('POST', `/api/bookings/${b.id}/approve`);
+          closeSlotModal();
+          refreshAfterSlotChange();
+        } catch (err) { alert(err.message); }
+      });
+      const declineBtn = box.querySelector('[data-modal-decline]');
+      if (declineBtn) declineBtn.addEventListener('click', async () => {
+        try {
+          await api('POST', `/api/bookings/${b.id}/decline`);
+          closeSlotModal();
+          refreshAfterSlotChange();
+        } catch (err) { alert(err.message); }
+      });
+      const cancelBookingBtn = box.querySelector('[data-modal-cancelbooking]');
+      if (cancelBookingBtn) cancelBookingBtn.addEventListener('click', async () => {
+        if (!confirm('Cancel this booking? The slot will reopen.')) return;
+        try {
+          await api('POST', '/api/bookings/cancel', { bookingId: b.id });
+          closeSlotModal();
+          refreshAfterSlotChange();
+        } catch (err) { alert(err.message); }
+      });
+    } catch (e) {
+      box.innerHTML = `<h3>${whenLabel}</h3><p class="error">${esc(e.message)}</p><button type="button" class="secondary" id="modalCancelBtn">Close</button>`;
+      document.getElementById('modalCancelBtn').addEventListener('click', closeSlotModal);
+    }
+  }
+
+  overlay.style.display = 'flex';
 }
 
 async function loadOtherCalendar() {
   const el = document.getElementById('otherCalendar');
   const other = allHairdressers.find(h => h.id !== me.id);
+  const otherBtn = document.getElementById('otherCalBtn');
   if (!other) {
-    document.getElementById('otherCalendarTitle').textContent = 'Other stylist\'s calendar';
+    otherBtn.textContent = 'Other stylist';
     el.innerHTML = '<p class="muted">No other stylist set up yet.</p>';
     return;
   }
-  document.getElementById('otherCalendarTitle').textContent = `${other.display_name}'s calendar`;
+  otherBtn.textContent = other.display_name;
   try {
     const today = new Date().toISOString().slice(0, 10);
     const slots = await api('GET', `/api/availability/hairdresser/${other.id}?from=${today}`);
@@ -241,27 +663,6 @@ async function loadOtherCalendar() {
   }
 }
 
-document.getElementById('availForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const msg = document.getElementById('availMsg');
-  msg.textContent = '';
-  const daysOfWeek = Array.from(document.querySelectorAll('#dayCheckboxes input:checked')).map(cb => Number(cb.value));
-  try {
-    const result = await api('POST', '/api/availability', {
-      startDate: document.getElementById('startDate').value,
-      endDate: document.getElementById('endDate').value,
-      startTime: document.getElementById('startTime').value,
-      endTime: document.getElementById('endTime').value,
-      daysOfWeek
-    });
-    msg.textContent = `Created ${result.created} new slot(s).`;
-    msg.className = 'success';
-    loadMyCalendar();
-  } catch (err) {
-    msg.textContent = err.message;
-    msg.className = 'error';
-  }
-});
 
 document.getElementById('profileForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -273,6 +674,7 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
       instagram_url: document.getElementById('instagram').value,
       facebook_url: document.getElementById('facebook').value,
       tiktok_url: document.getElementById('tiktok').value,
+      snapchat_url: document.getElementById('snapchat').value,
       website_url: document.getElementById('website').value
     });
     msg.textContent = 'Saved.';
