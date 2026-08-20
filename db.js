@@ -99,6 +99,8 @@ function ensureColumn(table, column, definition) {
   }
 }
 ensureColumn('hairdressers', 'snapchat_url', "TEXT DEFAULT ''");
+ensureColumn('hairdressers', 'is_admin', 'INTEGER DEFAULT 0');
+ensureColumn('hairdressers', 'is_active', 'INTEGER DEFAULT 1');
 ensureColumn('bookings', 'customer_phone', "TEXT DEFAULT ''");
 ensureColumn('availability_slots', 'block_id', 'INTEGER');
 
@@ -160,5 +162,26 @@ function renameLegacyStylistDisplayNames() {
   for (const r of renames) update.run(r.newName, r.username, r.oldName);
 }
 renameLegacyStylistDisplayNames();
+
+// One-time rename: the login usernames themselves started as generic
+// "stylist1"/"stylist2" placeholders - switch them to "charlie"/"angus" now
+// that those are the real names being used to log in day to day. Passwords
+// (password_hash) are completely untouched, so existing passwords keep
+// working under the new username. Runs once: after the first pass no row
+// matches the old username, so later restarts are a no-op.
+function renameLegacyStylistUsernames() {
+  const renames = [
+    { oldUsername: 'stylist1', newUsername: 'charlie' },
+    { oldUsername: 'stylist2', newUsername: 'angus' }
+  ];
+  const update = db.prepare('UPDATE hairdressers SET username = ? WHERE username = ?');
+  for (const r of renames) update.run(r.newUsername, r.oldUsername);
+}
+renameLegacyStylistUsernames();
+
+// Charlie is the one admin account - the only one who can add new stylist
+// logins from the dashboard. Enforced on every startup (not just once) so
+// this stays true no matter how the database got here.
+db.prepare("UPDATE hairdressers SET is_admin = 1 WHERE username = 'charlie' AND is_admin != 1").run();
 
 module.exports = db;

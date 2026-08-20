@@ -4,17 +4,18 @@
 
 ## 1. What this is
 
-Charlie's Cuts is a mobile-first booking web app for two independent freelance
-hairdressers, Charlie and Angus, who share a chair/salon space at 36 Wyralla
-Crescent, Gisborne, 3437. Customers browse each stylist's open half-hour
-slots and request a booking; the stylist approves or declines before it's
-locked in. There's no online payment — customers pay in person as they
-always have.
+Charlie's Cuts is a mobile-first booking web app for a small team of
+independent freelance hairdressers - currently Charlie and Angus - who share
+a chair/salon space at 36 Wyralla Crescent, Gisborne, 3437. Customers browse
+each stylist's open half-hour slots and request a booking; the stylist
+approves or declines before it's locked in. There's no online payment —
+customers pay in person as they always have.
 
 The app is deliberately simple: a single Node.js server, a SQLite database
 (one file), and a plain HTML/CSS/JS frontend with no build step. It's built
-to be cheap and easy to run for a two-person freelance business, not to
-scale to a chain of salons.
+to be cheap and easy to run for a small freelance team, not to scale to a
+chain of salons. The team isn't fixed at two — Charlie can add further
+stylists from his own dashboard (see section 3).
 
 ## 2. Who uses it
 
@@ -23,13 +24,17 @@ email is enough), though they can optionally create a simple login to see
 all their bookings in one place. They interact with the app entirely
 through a phone browser.
 
-**Stylists** — Charlie and Angus, each with their own login. Each manages
-their own availability, bio, social links, and photo gallery, approves or
-declines their own booking requests, and can see (read-only) the other's
-calendar to coordinate who's working when.
+**Stylists** — Charlie, Angus, and any further stylists Charlie adds, each
+with their own login. Each manages their own availability, bio, social
+links, and photo gallery, approves or declines their own booking requests,
+and can see (read-only) every other stylist's calendar to coordinate who's
+working when.
 
-There is no separate "admin" or "owner" role above the two stylists — they
-each have equal, independent control over their own side of the app.
+**Admin** — Charlie's account specifically is the one admin. This isn't a
+separate login, just a flag on his existing account: he gets an extra
+"Admin" tab on his dashboard (see section 3) that nobody else sees, used to
+add further stylist logins. Angus and any stylist Charlie adds are regular
+(non-admin) accounts with identical day-to-day features to each other.
 
 ## 3. Core features
 
@@ -79,8 +84,8 @@ later. Optionally, they can create a lightweight account (email + password)
 to see every booking they've made in one place at `/my-bookings.html`.
 Stylist accounts are separate logins, seeded initially and then managed by
 each stylist (username, password, display name, bio, social links). The
-internal login usernames are `stylist1` (Charlie) and `stylist2` (Angus) -
-these usernames are never shown to customers, only the display name is.
+login usernames are `charlie` and `angus` — these aren't shown to
+customers anywhere, only the display name is.
 
 **Profiles and social links.** Each stylist has a public bio and links to
 Instagram, Facebook, TikTok, Snapchat, and/or a personal website, shown on
@@ -90,15 +95,54 @@ their booking page.
 a shared gallery; uploads are scoped to whichever stylist is logged in when
 they upload, and photos can be deleted by their owner.
 
+**Managing stylists (admin only).** Charlie's dashboard has an extra "Admin"
+tab, hidden from everyone else, with three panels:
+
+- *Active stylists* — every current stylist (Charlie included), with a
+  "Reset password" button that sets a new password directly (no need to
+  know the old one — useful if someone's locked out), and a "Remove" button
+  on everyone except Charlie's own admin row, which can never be removed.
+- *Add a stylist* — a form (display name, username, temporary password)
+  that creates a brand-new stylist login with its own calendar,
+  availability, bookings, gallery and profile — identical day-to-day
+  features to Charlie and Angus, just without admin access. New stylists
+  show up in the Active stylists list and the dashboard's calendar toggle
+  immediately, no page reload needed.
+- *Customer accounts* — everyone who's created a customer login (not
+  people who've only booked anonymously), with "Reset password" and
+  "Delete" per account.
+
+Removing a stylist is a soft removal, not a hard delete: their account
+just stops being able to log in (any existing session is invalidated
+immediately too, not just future logins) and disappears from the public
+booking page and every "other stylist" calendar view, but their past
+bookings, availability history and gallery photos are all kept. If a
+removed stylist has upcoming pending/approved bookings, Charlie is asked
+to confirm first — confirming cancels those bookings and emails the
+affected customers the same cancellation notice used elsewhere in the app.
+Deleting a customer account is a genuine delete, but their past bookings
+stay intact (a booking already stores the customer's name/email directly,
+independent of whether their account still exists).
+
+The dashboard's calendar view ("My calendar" / other stylists) and the
+public homepage's stylist list both already scale to any number of active
+stylists, not just two — adding a third or fourth doesn't need any further
+changes. New stylists should change their temporary password from their
+own Profile tab after logging in for the first time.
+
 ## 4. What's deliberately out of scope (v1)
 
 - **No online payments.** Everything is pay-in-person, as it is today. The
   `bookings` table has room to add a `payment_status` column later if a
   deposit-via-Stripe-Checkout flow is ever wanted.
-- **No admin/owner console.** Charlie and Angus each manage their own side
-  independently; there's no shared settings screen or third "manager" role.
+- **No way to transfer or revoke admin status** from the dashboard — Charlie
+  is permanently the one admin account (removing/reactivating regular
+  stylists is supported; see section 3).
+- **No way to reactivate a removed stylist** from the dashboard once
+  removed — their row still exists (nothing is hard-deleted), so it's
+  possible directly in the database, just not from the UI yet.
 - **No multi-location support.** The app assumes one shared physical
-  address for both stylists.
+  address for all stylists.
 - **No SMS reminders.** Only email notifications exist today.
 - **Sessions are stored in server memory**, which is fine for a single
   small server process. This would need to change (e.g. to a database-backed
@@ -108,7 +152,9 @@ they upload, and photos can be deleted by their owner.
 ## 5. Data model (SQLite)
 
 - **hairdressers** — one row per stylist: login credentials, display name,
-  bio, and social links.
+  bio, social links, an `is_admin` flag (only ever set for Charlie), and an
+  `is_active` flag used to soft-remove a stylist without deleting their row
+  or any of their linked data.
 - **customers** — optional accounts for people who choose to sign up rather
   than book anonymously.
 - **availability_blocks** — the date range / days-of-week / time-window
@@ -133,6 +179,10 @@ they upload, and photos can be deleted by their owner.
 - **File uploads:** `multer`, storing gallery photos under `uploads/`.
 - **Frontend:** plain HTML/CSS/JS served as static files — no framework, no
   build step, no bundler. Mobile-first, single-column responsive layout.
+  Visual theme: a pure white (`#ffffff`) app background matching the logo
+  artwork's own background, with content in a slightly off-white "surface"
+  tone for tiles/cards so they still stand out subtly rather than blending
+  completely into the page.
 - **IDs/tokens:** `nanoid` for the unguessable per-booking access tokens
   used in status links.
 
@@ -169,6 +219,12 @@ nameservers (not a real limitation in practice). `.com.au` was considered
 for the "local trust" signal but requires an Australian ABN/ACN to
 register, so `.com` was the simpler choice to get live today.
 
+**Status: `charlies-cuts.com` is registered** (1-year registration via
+Cloudflare, 20 August 2026). Still to do: deploy to Railway, then point the
+domain's DNS at the live Railway service (a couple of DNS records pasted
+into Cloudflare's DNS panel once Railway provides them) — set a calendar
+reminder for renewal ahead of August 2027.
+
 ## 8. Account recovery (forgotten passwords)
 
 There is currently **no self-service "forgot password" flow** — the
@@ -180,10 +236,9 @@ resets).
 If Charlie or Angus forgets their password today, recovery is a manual
 step: run `node reset-password.js <username> <newPassword>` from the
 project folder (locally, or via the host's shell/console once deployed),
-e.g. `node reset-password.js stylist1 aNewPassword123`. This sets a new
-password directly in the database without needing the old one.
-`stylist1` is Charlie's login and `stylist2` is Angus's login — those
-internal usernames don't change even though their display names do.
+e.g. `node reset-password.js charlie aNewPassword123`. This sets a new
+password directly in the database without needing the old one. Login
+usernames are `charlie` and `angus`.
 
 A proper self-service "forgot password" email flow (a reset link, valid for
 a short time, sent to the stylist's own registered email) would be a

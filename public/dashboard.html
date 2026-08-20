@@ -8,7 +8,7 @@
 </head>
 <body class="has-bottom-nav">
 <header class="site">
-  <a class="brand" href="/"><img src="/img/logo.png" alt="Charlie's Cuts" class="brand-logo"></a>
+  <a class="brand" href="/"><img src="/img/logo.png?v=2" alt="Charlie's Cuts" class="brand-logo"></a>
   <nav class="site-nav">
     <a href="/gallery.html">Gallery</a>
     <button class="secondary" id="logoutBtn">Log out</button>
@@ -34,7 +34,7 @@
     <div class="card">
       <div class="segmented" id="calendarToggle">
         <button type="button" class="active" data-cal="mine">My calendar</button>
-        <button type="button" id="otherCalBtn" data-cal="other">Other stylist</button>
+        <!-- one button per other stylist, injected in renderCalendarToggleButtons() -->
       </div>
       <div id="myCalendar"><p class="muted">Loading...</p></div>
       <div id="otherCalendar" style="display:none;"><p class="muted">Loading...</p></div>
@@ -116,6 +116,37 @@
       <div id="myGallery" class="gallery-grid" style="margin-top:1rem;"></div>
     </div>
   </section>
+
+  <section class="dash-screen" data-screen="admin">
+    <div class="card">
+      <h2>Active stylists</h2>
+      <p class="muted">This Admin tab is only visible on your account. Reset a stylist's password, or remove them from the roster - your own admin account can't be removed.</p>
+      <div id="stylistManageList"><p class="muted">Loading...</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Add a stylist</h2>
+      <p class="muted">Creates a new login with its own calendar, availability, bookings, gallery and profile - same features Charlie and Angus already have.</p>
+      <form id="addStylistForm">
+        <label for="newStylistName">Display name</label>
+        <input id="newStylistName" required placeholder="e.g. Sam">
+        <label for="newStylistUsername">Username</label>
+        <input id="newStylistUsername" required placeholder="e.g. sam">
+        <label for="newStylistPassword">Temporary password</label>
+        <input id="newStylistPassword" type="password" required minlength="6" placeholder="6+ characters">
+        <div style="margin-top:1rem;">
+          <button type="submit">Add stylist</button>
+        </div>
+        <p id="addStylistMsg"></p>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Customer accounts</h2>
+      <p class="muted">Everyone who's created a customer account (not people who've only booked anonymously). Delete an account, or reset its password if they're locked out.</p>
+      <div id="customerManageList"><p class="muted">Loading...</p></div>
+    </div>
+  </section>
 </main>
 
 <nav class="bottom-tabs">
@@ -123,6 +154,7 @@
   <button type="button" data-tab="calendar"><span class="tab-icon">📅</span>Calendar</button>
   <button type="button" data-tab="availability"><span class="tab-icon">➕</span>Availability</button>
   <button type="button" data-tab="profile"><span class="tab-icon">👤</span>Profile</button>
+  <button type="button" data-tab="admin" id="adminTabBtn" style="display:none;"><span class="tab-icon">🛠️</span>Admin</button>
 </nav>
 
 <div id="slotModalOverlay" class="modal-overlay" style="display:none;">
@@ -149,14 +181,46 @@ document.querySelectorAll('.bottom-tabs [data-tab]').forEach(btn => {
 });
 
 // ---------- My calendar / other stylist's calendar toggle ----------
-document.querySelectorAll('#calendarToggle [data-cal]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#calendarToggle [data-cal]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('myCalendar').style.display = btn.dataset.cal === 'mine' ? 'block' : 'none';
-    document.getElementById('otherCalendar').style.display = btn.dataset.cal === 'other' ? 'block' : 'none';
-  });
+// There can be any number of "other" stylists now (Charlie can add more from
+// his profile page), so the toggle buttons are built dynamically in
+// renderCalendarToggleButtons() rather than hardcoded in the HTML - this
+// delegated listener picks up clicks on buttons added after page load too.
+document.getElementById('calendarToggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-cal]');
+  if (!btn || btn.disabled) return;
+  document.querySelectorAll('#calendarToggle [data-cal]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('myCalendar').style.display = btn.dataset.cal === 'mine' ? 'block' : 'none';
+  document.getElementById('otherCalendar').style.display = btn.dataset.cal === 'other' ? 'block' : 'none';
+  if (btn.dataset.cal === 'other') {
+    loadOtherCalendar(Number(btn.dataset.hdId));
+  }
 });
+
+// Rebuilds the "Other stylist(s)" toggle buttons from the current
+// allHairdressers list - called on init and again after adding a stylist.
+function renderCalendarToggleButtons() {
+  const toggle = document.getElementById('calendarToggle');
+  toggle.querySelectorAll('[data-cal="other"]').forEach(b => b.remove());
+  const others = allHairdressers.filter(h => h.id !== me.id);
+  if (others.length === 0) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.cal = 'other';
+    btn.disabled = true;
+    btn.textContent = 'No other stylists yet';
+    toggle.appendChild(btn);
+    return;
+  }
+  others.forEach(h => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.cal = 'other';
+    btn.dataset.hdId = h.id;
+    btn.textContent = h.display_name;
+    toggle.appendChild(btn);
+  });
+}
 
 // Half-hour-only time options, limited to a 9am-9pm working day - there's
 // no need to scroll through the middle of the night to book a haircut.
@@ -281,13 +345,18 @@ async function init() {
   document.getElementById('tiktok').value = me.tiktok_url || '';
   document.getElementById('snapchat').value = me.snapchat_url || '';
   document.getElementById('website').value = me.website_url || '';
+  if (me.is_admin) {
+    document.getElementById('adminTabBtn').style.display = '';
+    loadCustomerManageList();
+  }
 
   allHairdressers = await api('GET', '/api/hairdressers');
+  renderCalendarToggleButtons();
+  renderStylistManageList();
 
   loadPending();
   loadUpcomingBookings();
   loadMyCalendar();
-  loadOtherCalendar();
   loadMyGallery();
 }
 
@@ -731,16 +800,14 @@ async function openSlotModal(slotId, status, date, startTime) {
   overlay.style.display = 'flex';
 }
 
-async function loadOtherCalendar() {
+async function loadOtherCalendar(hdId) {
   const el = document.getElementById('otherCalendar');
-  const other = allHairdressers.find(h => h.id !== me.id);
-  const otherBtn = document.getElementById('otherCalBtn');
+  const other = allHairdressers.find(h => h.id === hdId);
   if (!other) {
-    otherBtn.textContent = 'Other stylist';
-    el.innerHTML = '<p class="muted">No other stylist set up yet.</p>';
+    el.innerHTML = '<p class="muted">Stylist not found.</p>';
     return;
   }
-  otherBtn.textContent = other.display_name;
+  el.innerHTML = '<p class="muted">Loading...</p>';
   try {
     const today = new Date().toISOString().slice(0, 10);
     const slots = await api('GET', `/api/availability/hairdresser/${other.id}?from=${today}`);
@@ -789,6 +856,148 @@ document.getElementById('passwordForm').addEventListener('submit', async (e) => 
     msg.className = 'error';
   }
 });
+
+document.getElementById('addStylistForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('addStylistMsg');
+  msg.textContent = '';
+  try {
+    const created = await api('POST', '/api/hairdressers', {
+      display_name: document.getElementById('newStylistName').value,
+      username: document.getElementById('newStylistUsername').value,
+      password: document.getElementById('newStylistPassword').value
+    });
+    msg.textContent = `Added "${created.display_name}" - they can log in with username "${created.username}" and the password you just set. They should change it from their own profile page once they log in.`;
+    msg.className = 'success';
+    e.target.reset();
+    allHairdressers = await api('GET', '/api/hairdressers');
+    renderCalendarToggleButtons();
+    renderStylistManageList();
+  } catch (err) {
+    msg.textContent = err.message;
+    msg.className = 'error';
+  }
+});
+
+// ---------- Admin: manage stylists (reset password / remove) ----------
+function renderStylistManageList() {
+  const el = document.getElementById('stylistManageList');
+  if (!el || !me.is_admin) return;
+  if (allHairdressers.length === 0) {
+    el.innerHTML = '<p class="muted">No stylists yet.</p>';
+    return;
+  }
+  el.innerHTML = allHairdressers.map(h => `
+    <div class="block-tile">
+      <div class="block-tile-info">
+        <strong>${esc(h.display_name)}</strong>
+        <span class="muted">@${esc(h.username)}${h.is_admin ? ' &middot; admin' : ''}</span>
+      </div>
+      <div class="row" style="display:flex; gap:0.4rem; flex:0 0 auto;">
+        <button type="button" class="secondary" data-reset-stylist="${h.id}" style="font-size:0.8rem; padding:0.35rem 0.6rem; flex:none;">Reset password</button>
+        ${h.is_admin ? '' : `<button type="button" class="secondary block-tile-remove" data-remove-stylist="${h.id}">Remove</button>`}
+      </div>
+    </div>
+  `).join('');
+
+  el.querySelectorAll('[data-reset-stylist]').forEach(btn => btn.addEventListener('click', () => {
+    const h = allHairdressers.find(x => x.id === Number(btn.dataset.resetStylist));
+    resetStylistPassword(h);
+  }));
+  el.querySelectorAll('[data-remove-stylist]').forEach(btn => btn.addEventListener('click', () => {
+    const h = allHairdressers.find(x => x.id === Number(btn.dataset.removeStylist));
+    removeStylist(h, false);
+  }));
+}
+
+async function resetStylistPassword(h) {
+  const newPass = prompt(`New password for ${h.display_name} (6+ characters):`);
+  if (!newPass) return;
+  if (newPass.length < 6) { alert('Password must be at least 6 characters.'); return; }
+  try {
+    await api('POST', `/api/hairdressers/${h.id}/reset-password`, { newPassword: newPass });
+    alert(`Password reset for ${h.display_name}.`);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function removeStylist(h, confirmCancelBookings) {
+  if (!confirmCancelBookings) {
+    const ok = confirm(`Remove ${h.display_name}? They'll no longer be able to log in, and will disappear from the booking page. Their past bookings and photos are kept.`);
+    if (!ok) return;
+  }
+  try {
+    await api('DELETE', `/api/hairdressers/${h.id}`, confirmCancelBookings ? { confirmCancelBookings: true } : {});
+    allHairdressers = await api('GET', '/api/hairdressers');
+    renderCalendarToggleButtons();
+    renderStylistManageList();
+  } catch (err) {
+    if (err.data && err.data.upcomingBookingsCount) {
+      const ok = confirm(`${err.message}`);
+      if (ok) await removeStylist(h, true);
+    } else {
+      alert(err.message);
+    }
+  }
+}
+
+// ---------- Admin: manage customer accounts ----------
+let allCustomers = [];
+
+async function loadCustomerManageList() {
+  const el = document.getElementById('customerManageList');
+  try {
+    allCustomers = await api('GET', '/api/auth/admin/customers');
+    renderCustomerManageList();
+  } catch (err) {
+    el.innerHTML = `<p class="error">${esc(err.message)}</p>`;
+  }
+}
+
+function renderCustomerManageList() {
+  const el = document.getElementById('customerManageList');
+  if (allCustomers.length === 0) {
+    el.innerHTML = '<p class="muted">No customer accounts yet.</p>';
+    return;
+  }
+  el.innerHTML = allCustomers.map(c => `
+    <div class="block-tile">
+      <div class="block-tile-info">
+        <strong>${esc(c.name)}</strong>
+        <span class="muted">${esc(c.email)}</span>
+      </div>
+      <div class="row" style="display:flex; gap:0.4rem; flex:0 0 auto;">
+        <button type="button" class="secondary" data-reset-customer="${c.id}" style="font-size:0.8rem; padding:0.35rem 0.6rem; flex:none;">Reset password</button>
+        <button type="button" class="secondary block-tile-remove" data-remove-customer="${c.id}">Delete</button>
+      </div>
+    </div>
+  `).join('');
+
+  el.querySelectorAll('[data-reset-customer]').forEach(btn => btn.addEventListener('click', async () => {
+    const c = allCustomers.find(x => x.id === Number(btn.dataset.resetCustomer));
+    const newPass = prompt(`New password for ${c.name} (6+ characters):`);
+    if (!newPass) return;
+    if (newPass.length < 6) { alert('Password must be at least 6 characters.'); return; }
+    try {
+      await api('POST', `/api/auth/admin/customers/${c.id}/reset-password`, { newPassword: newPass });
+      alert(`Password reset for ${c.name}.`);
+    } catch (err) {
+      alert(err.message);
+    }
+  }));
+  el.querySelectorAll('[data-remove-customer]').forEach(btn => btn.addEventListener('click', async () => {
+    const c = allCustomers.find(x => x.id === Number(btn.dataset.removeCustomer));
+    if (!confirm(`Delete the customer account for ${c.name} (${c.email})? Their past bookings are kept, just no longer linked to a login.`)) return;
+    try {
+      await api('DELETE', `/api/auth/admin/customers/${c.id}`);
+      allCustomers = allCustomers.filter(x => x.id !== c.id);
+      renderCustomerManageList();
+    } catch (err) {
+      alert(err.message);
+    }
+  }));
+}
 
 document.getElementById('galleryForm').addEventListener('submit', async (e) => {
   e.preventDefault();

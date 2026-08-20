@@ -15,7 +15,9 @@ async function api(method, url, body) {
   try { data = await res.json(); } catch (e) { /* no body */ }
   if (!res.ok) {
     const message = (data && data.error) || `Request failed (${res.status})`;
-    throw new Error(message);
+    const err = new Error(message);
+    err.data = data; // any extra fields the endpoint sent alongside the error (e.g. upcomingBookingsCount)
+    throw err;
   }
   return data;
 }

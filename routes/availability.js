@@ -5,6 +5,11 @@ const router = express.Router();
 
 function requireHairdresser(req, res, next) {
   if (!req.session.hairdresserId) return res.status(401).json({ error: 'Not logged in' });
+  const hd = db.prepare('SELECT is_active FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
+  if (!hd || !hd.is_active) {
+    req.session.hairdresserId = null;
+    return res.status(401).json({ error: 'This account is no longer active' });
+  }
   next();
 }
 

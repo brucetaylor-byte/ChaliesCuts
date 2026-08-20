@@ -70,15 +70,20 @@ breaks.
 
 ### Default logins (change these immediately)
 
-| Username  | Password    |
-|-----------|-------------|
-| stylist1  | changeme1   |
-| stylist2  | changeme2   |
+| Username | Password    |
+|----------|-------------|
+| charlie  | changeme1   |
+| angus    | changeme2   |
 
 Log in at `/login.html`, then use the "Change password" section on the
 dashboard to set a real password. You can also rename the display name, bio
-and social links from the dashboard - the `stylist1` / `stylist2` usernames
-themselves are just internal login IDs and never shown to customers.
+and social links from the dashboard.
+
+If a stylist forgets their password later, there's no self-service "forgot
+password" flow yet - run `node reset-password.js <username> <newPassword>`
+(e.g. `node reset-password.js charlie aNewPassword123`) from the project
+folder, or via your host's shell/console once deployed, to set a new one
+directly.
 
 ## Everyday use
 

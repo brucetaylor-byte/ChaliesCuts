@@ -5,18 +5,15 @@
 // from the project folder (locally, or via your host's shell/console once
 // deployed) to set a new one straight away:
 //
-//   node reset-password.js stylist1 aNewPassword123
-//   node reset-password.js stylist2 aNewPassword123
-//
-// Remember "stylist1" = Charlie's login and "stylist2" = Angus's login -
-// those internal usernames never change even though their display names do.
+//   node reset-password.js charlie aNewPassword123
+//   node reset-password.js angus aNewPassword123
 const bcrypt = require('bcryptjs');
 const db = require('./db');
 
 const [, , username, newPassword] = process.argv;
 if (!username || !newPassword) {
   console.error('Usage: node reset-password.js <username> <newPassword>');
-  console.error('  e.g. node reset-password.js stylist1 aNewPassword123');
+  console.error('  e.g. node reset-password.js charlie aNewPassword123');
   process.exit(1);
 }
 if (newPassword.length < 6) {
@@ -26,7 +23,7 @@ if (newPassword.length < 6) {
 
 const hd = db.prepare('SELECT id, display_name FROM hairdressers WHERE username = ?').get(username.trim().toLowerCase());
 if (!hd) {
-  console.error(`No stylist found with username "${username}". Valid usernames: stylist1, stylist2.`);
+  console.error(`No stylist found with username "${username}". Valid usernames: charlie, angus.`);
   process.exit(1);
 }
 

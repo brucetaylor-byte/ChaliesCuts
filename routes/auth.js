@@ -14,9 +14,12 @@ router.post('/hairdresser/login', (req, res) => {
   if (!hd || !bcrypt.compareSync(password, hd.password_hash)) {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
+  if (!hd.is_active) {
+    return res.status(403).json({ error: 'This account has been removed. Contact the salon admin.' });
+  }
 
   req.session.hairdresserId = hd.id;
-  res.json({ id: hd.id, username: hd.username, display_name: hd.display_name });
+  res.json({ id: hd.id, username: hd.username, display_name: hd.display_name, is_admin: !!hd.is_admin });
 });
 
 router.post('/hairdresser/logout', (req, res) => {
@@ -41,9 +44,12 @@ router.put('/hairdresser/password', (req, res) => {
 
 router.get('/hairdresser/me', (req, res) => {
   if (!req.session.hairdresserId) return res.status(401).json({ error: 'Not logged in' });
-  const hd = db.prepare('SELECT id, username, display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
-  if (!hd) return res.status(401).json({ error: 'Not logged in' });
-  res.json(hd);
+  const hd = db.prepare('SELECT id, username, display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url, is_admin, is_active FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
+  if (!hd || !hd.is_active) {
+    req.session.hairdresserId = null;
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  res.json({ ...hd, is_admin: !!hd.is_admin });
 });
 
 // ---------- Customer auth (optional accounts) ----------
@@ -85,6 +91,48 @@ router.get('/customer/me', (req, res) => {
   const c = db.prepare('SELECT id, name, email FROM customers WHERE id = ?').get(req.session.customerId);
   if (!c) return res.status(401).json({ error: 'Not logged in' });
   res.json(c);
+});
+
+// ---------- Admin (Charlie): managing customer accounts ----------
+
+function requireAdmin(req, res, next) {
+  if (!req.session.hairdresserId) return res.status(401).json({ error: 'Not logged in' });
+  const hd = db.prepare('SELECT is_admin, is_active FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
+  if (!hd || !hd.is_active) {
+    req.session.hairdresserId = null;
+    return res.status(401).json({ error: 'This account is no longer active' });
+  }
+  if (!hd.is_admin) return res.status(403).json({ error: 'Only the admin stylist can do that' });
+  next();
+}
+
+// List everyone who's created a customer account (not people who've only
+// ever booked anonymously - those never get a row in this table).
+router.get('/admin/customers', requireAdmin, (req, res) => {
+  const rows = db.prepare('SELECT id, name, email, created_at FROM customers ORDER BY created_at DESC').all();
+  res.json(rows);
+});
+
+// Deletes the account itself only. Their booking history is untouched -
+// bookings already store the customer's name/email directly, and
+// bookings.customer_id just falls back to NULL (see db.js schema), so the
+// salon keeps its records even after the account is gone.
+router.delete('/admin/customers/:id', requireAdmin, (req, res) => {
+  const info = db.prepare('DELETE FROM customers WHERE id = ?').run(req.params.id);
+  if (info.changes === 0) return res.status(404).json({ error: 'Customer account not found' });
+  res.json({ ok: true });
+});
+
+router.post('/admin/customers/:id/reset-password', requireAdmin, (req, res) => {
+  const { newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters' });
+  }
+  const customer = db.prepare('SELECT id FROM customers WHERE id = ?').get(req.params.id);
+  if (!customer) return res.status(404).json({ error: 'Customer account not found' });
+  const password_hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE customers SET password_hash = ? WHERE id = ?').run(password_hash, customer.id);
+  res.json({ ok: true });
 });
 
 module.exports = router;

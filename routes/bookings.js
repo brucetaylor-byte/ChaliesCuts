@@ -41,6 +41,11 @@ async function notifyBookingEmail(req, booking, kind) {
 
 function requireHairdresser(req, res, next) {
   if (!req.session.hairdresserId) return res.status(401).json({ error: 'Not logged in' });
+  const hd = db.prepare('SELECT is_active FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
+  if (!hd || !hd.is_active) {
+    req.session.hairdresserId = null;
+    return res.status(401).json({ error: 'This account is no longer active' });
+  }
   next();
 }
 
@@ -248,5 +253,10 @@ router.post('/:id/decline', requireHairdresser, (req, res) => {
   notifyBookingEmail(req, full, 'declined');
   res.json(full);
 });
+
+// Exposed so routes/hairdressers.js can reuse them when removing a stylist
+// (cancelling their upcoming bookings and emailing the affected customers).
+router.notifyBookingEmail = notifyBookingEmail;
+router.bookingWithSlot = bookingWithSlot;
 
 module.exports = router;
