@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stylist Dashboard</title>
-<link rel="stylesheet" href="/css/style.css?v=7">
+<link rel="stylesheet" href="/css/style.css?v=13">
 </head>
 <body class="has-bottom-nav">
 <header class="site">
@@ -381,21 +381,108 @@ function renderCalendar(slots, readOnly) {
   `).join('');
 }
 
+let myCalExpanded = { key: null };
+let otherCalExpanded = { key: null };
+
 async function loadMyCalendar() {
   const el = document.getElementById('myCalendar');
   try {
     const today = new Date().toISOString().slice(0, 10);
     const slots = await api('GET', `/api/availability/hairdresser/${me.id}?from=${today}`);
-    el.innerHTML = renderCalendar(slots, false);
-    el.querySelectorAll('.slot.clickable').forEach(s => s.addEventListener('click', () => {
-      openSlotModal(s.dataset.slotId, s.dataset.status, s.dataset.date, s.dataset.start);
-    }));
+    renderCalendarWeeks('myCalendar', slots, true, myCalExpanded);
     renderWeeksList(slots);
   } catch (e) {
     el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
     const weeksEl = document.getElementById('availabilityWeeks');
     if (weeksEl) weeksEl.innerHTML = `<p class="error">${esc(e.message)}</p>`;
   }
+}
+
+// Shared by "My calendar" and "Other stylist calendar" - breaks a flat slot
+// list into This week (always expanded), Next week (collapsed), and every
+// week beyond that (collapsed, one row each under "Later availability").
+// Mirrors the same pattern customers see on the public booking page, so a
+// long list of open weeks doesn't turn into one giant wall of days.
+function renderCalendarWeeks(containerId, slots, clickable, state) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (slots.length === 0) {
+    el.innerHTML = '<p class="muted">No upcoming slots.</p>';
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const thisWeekStart = startOfWeek(today);
+  const thisWeekEnd = addDays(thisWeekStart, 6);
+  const nextWeekStart = addDays(thisWeekStart, 7);
+  const nextWeekEnd = addDays(nextWeekStart, 6);
+
+  const thisWeekSlots = slots.filter(s => s.date <= thisWeekEnd);
+  const nextWeekSlots = slots.filter(s => s.date >= nextWeekStart && s.date <= nextWeekEnd);
+  const laterSlots = slots.filter(s => s.date > nextWeekEnd);
+
+  const byLaterWeek = {};
+  for (const s of laterSlots) {
+    const wk = startOfWeek(s.date);
+    (byLaterWeek[wk] = byLaterWeek[wk] || []).push(s);
+  }
+  const laterWeekKeys = Object.keys(byLaterWeek).sort();
+
+  let html = `
+    <div class="card week-section">
+      <h3 class="week-section-title">This week</h3>
+      ${renderCalendar(thisWeekSlots, !clickable)}
+    </div>
+  `;
+
+  const nextOpen = state.key === 'next';
+  html += `
+    <div class="week-card">
+      <button type="button" class="week-header" data-weekkey="next" aria-expanded="${nextOpen}">
+        <span>Next week</span>
+        <span class="week-header-meta muted">${nextWeekSlots.length} slot${nextWeekSlots.length === 1 ? '' : 's'} <span class="week-chevron">${nextOpen ? '&#9662;' : '&#9656;'}</span></span>
+      </button>
+      <div class="week-body" style="display:${nextOpen ? 'block' : 'none'};">
+        ${nextOpen ? renderCalendar(nextWeekSlots, !clickable) : ''}
+      </div>
+    </div>
+  `;
+
+  if (laterWeekKeys.length > 0) {
+    html += `<p class="week-later-heading muted">Later availability</p>`;
+    html += laterWeekKeys.map(wk => {
+      const weekEnd = addDays(wk, 6);
+      const weekSlots = byLaterWeek[wk];
+      const isOpen = state.key === wk;
+      return `
+        <div class="week-card">
+          <button type="button" class="week-header" data-weekkey="${wk}" aria-expanded="${isOpen}">
+            <span>${fmtDate(wk)} &ndash; ${fmtDate(weekEnd)}</span>
+            <span class="week-header-meta muted">${weekSlots.length} slot${weekSlots.length === 1 ? '' : 's'} <span class="week-chevron">${isOpen ? '&#9662;' : '&#9656;'}</span></span>
+          </button>
+          <div class="week-body" style="display:${isOpen ? 'block' : 'none'};">
+            ${isOpen ? renderCalendar(weekSlots, !clickable) : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  el.innerHTML = html;
+
+  if (clickable) {
+    el.querySelectorAll('.slot.clickable').forEach(s => s.addEventListener('click', () => {
+      openSlotModal(s.dataset.slotId, s.dataset.status, s.dataset.date, s.dataset.start);
+    }));
+  }
+
+  el.querySelectorAll('.week-header').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.weekkey;
+      state.key = (state.key === key) ? null : key;
+      renderCalendarWeeks(containerId, slots, clickable, state);
+    });
+  });
 }
 
 // ---------- "Your availability" - grouped by calendar week, expand to manage slots ----------
@@ -657,7 +744,7 @@ async function loadOtherCalendar() {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const slots = await api('GET', `/api/availability/hairdresser/${other.id}?from=${today}`);
-    el.innerHTML = renderCalendar(slots, true);
+    renderCalendarWeeks('otherCalendar', slots, false, otherCalExpanded);
   } catch (e) {
     el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
   }

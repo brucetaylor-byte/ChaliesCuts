@@ -128,17 +128,87 @@ h1, h2, h3 { line-height: 1.25; }
   gap: 0.75rem;
 }
 
-.hairdresser-card {
-  display: flex;
+/* ---------- Homepage-only: slim header, hero banner, stylist rows ---------- */
+header.site.slim {
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  text-align: left;
+  padding: 0.85rem 3.4rem 0.85rem 1.1rem;
   gap: 0.75rem;
-  text-decoration: none;
-  color: inherit;
+}
+header.site.slim .brand { font-size: 1.05rem; width: auto; justify-content: flex-start; flex-shrink: 0; }
+header.site.slim nav.site-nav { flex: 1; justify-content: flex-end; font-size: 0.9rem; gap: 0.9rem; }
+
+.hero-image-wrap {
+  width: 100%;
+  border-bottom: 1px solid var(--line);
+  line-height: 0;
+}
+.hero-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.hero-sub {
+  background: var(--ink);
+  color: #fff;
+  margin: 1.1rem auto 1.5rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  text-align: center;
+  max-width: 36ch;
 }
 
-.hairdresser-card .name { font-weight: 600; font-size: 1.05rem; }
-.hairdresser-card .bio { color: var(--muted); font-size: 0.9rem; }
+.section-label {
+  font-size: 1.05rem;
+  margin: 0 0 0.75rem;
+  color: var(--ink);
+}
+
+.stylist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.stylist-row:hover { border-color: var(--accent); transform: translateY(-1px); }
+.stylist-row:active { transform: translateY(0); }
+
+.stylist-avatar {
+  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--booked));
+}
+.stylist-row:nth-of-type(2n) .stylist-avatar { background: linear-gradient(135deg, var(--pending), var(--booked)); }
+
+.stylist-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.stylist-row-name { font-weight: 600; font-size: 1.05rem; }
+.stylist-row-bio {
+  color: var(--muted);
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stylist-row .chevron { flex-shrink: 0; color: var(--muted); font-size: 1.5rem; line-height: 1; }
 
 button, .btn {
   display: inline-block;
@@ -416,7 +486,7 @@ body.has-bottom-nav main { padding-bottom: 5rem; }
 }
 
 .segmented button.active {
-  background: var(--accent);
+  background: var(--booked);
   color: var(--accent-ink);
 }
 

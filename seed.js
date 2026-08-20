@@ -4,8 +4,8 @@ const bcrypt = require('bcryptjs');
 const db = require('./db');
 
 const HAIRDRESSERS = [
-  { username: 'stylist1', password: 'changeme1', display_name: 'Alex (Stylist 1)' },
-  { username: 'stylist2', password: 'changeme2', display_name: 'Sam (Stylist 2)' }
+  { username: 'stylist1', password: 'changeme1', display_name: 'Charlie' },
+  { username: 'stylist2', password: 'changeme2', display_name: 'Angus' }
 ];
 
 const insert = db.prepare(`

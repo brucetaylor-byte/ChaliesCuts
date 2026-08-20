@@ -146,4 +146,19 @@ function backfillLegacyAvailabilityBlocks() {
 }
 backfillLegacyAvailabilityBlocks();
 
+// One-time rename: the app was originally seeded with placeholder display
+// names before the real stylists' names were known. Fix them up to "Charlie"
+// and "Angus" if they're still sitting at the original placeholder text -
+// logins and passwords are untouched, and if a stylist has since changed
+// their own display name from the dashboard, this leaves it alone.
+function renameLegacyStylistDisplayNames() {
+  const renames = [
+    { username: 'stylist1', oldName: 'Alex (Stylist 1)', newName: 'Charlie' },
+    { username: 'stylist2', oldName: 'Sam (Stylist 2)', newName: 'Angus' }
+  ];
+  const update = db.prepare('UPDATE hairdressers SET display_name = ? WHERE username = ? AND display_name = ?');
+  for (const r of renames) update.run(r.newName, r.username, r.oldName);
+}
+renameLegacyStylistDisplayNames();
+
 module.exports = db;

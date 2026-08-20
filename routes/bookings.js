@@ -6,6 +6,11 @@ const { formatDateForEmail, formatTimeForEmail } = require('../lib/emailFormat')
 
 const router = express.Router();
 
+// Shared salon address/contact block, appended to booking-confirmed emails
+// so a customer knows exactly where to show up without having to ask.
+const VENUE_ADDRESS = '36 Wyralla Crescent\nGisborne, 3437';
+const VENUE_CONTACTS = 'Contact either Charlie on 0493 032 545 or Angus on [ADD ANGUS\'S NUMBER]';
+
 // Fire-and-forget booking status email. Never throws - a template or send
 // failure is logged and swallowed so it can never break the request that
 // triggered it (approve/decline/cancel all respond to the client either way).
@@ -18,7 +23,7 @@ async function notifyBookingEmail(req, booking, kind) {
     let subject, text;
     if (kind === 'approved') {
       subject = `Booking confirmed - ${formatDateForEmail(booking.slot.date)}`;
-      text = `Hi ${booking.customer_name},\n\nYour haircut with ${stylist} is confirmed for ${when}.\n\nNeed to check the details or cancel later? Use your booking link:\n${link}\n\nSee you then!\nCharlie's Cuts`;
+      text = `Hi ${booking.customer_name},\n\nThank you for your booking - your appointment with ${stylist} has been confirmed for ${when}.\n\nPlease be at:\n${VENUE_ADDRESS}\n\n${VENUE_CONTACTS}\n\nNeed to check the details or cancel later? Use your booking link:\n${link}\n\nSee you then!\nCharlie's Cuts`;
     } else if (kind === 'declined') {
       subject = `About your booking request - ${formatDateForEmail(booking.slot.date)}`;
       text = `Hi ${booking.customer_name},\n\nSorry, ${stylist} isn't able to take your requested slot on ${when}. Head back to the app when you get a chance and pick another time that suits.\n\nCharlie's Cuts`;
