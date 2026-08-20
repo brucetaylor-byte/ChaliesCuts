@@ -39,6 +39,28 @@ async function notifyBookingEmail(req, booking, kind) {
   }
 }
 
+// Fire-and-forget: tells the stylist a new booking request has come in, sent
+// to whichever email Charlie set up for them (contact_email) - so booking
+// queries land in each stylist's own inbox rather than one shared one, and
+// they don't have to keep the dashboard open to notice a new request. Same
+// swallow-errors behaviour as notifyBookingEmail: never breaks the customer's
+// booking request even if the email fails or no contact_email is set yet.
+async function notifyStylistOfNewRequest(req, booking) {
+  try {
+    const hd = db.prepare('SELECT display_name, contact_email FROM hairdressers WHERE id = ?').get(booking.hairdresser_id);
+    if (!hd || !hd.contact_email) return;
+    const slot = db.prepare('SELECT * FROM availability_slots WHERE id = ?').get(booking.slot_id);
+    if (!slot) return;
+    const when = `${formatDateForEmail(slot.date)} at ${formatTimeForEmail(slot.start_time)}`;
+    const contactBits = [booking.customer_email, booking.customer_phone].filter(Boolean).join(' / ');
+    const subject = `New booking request - ${formatDateForEmail(slot.date)}`;
+    const text = `Hi ${hd.display_name},\n\n${booking.customer_name} has requested ${when}${contactBits ? ` (${contactBits})` : ''}.${booking.note ? `\n\nNote: ${booking.note}` : ''}\n\nApprove or decline it from your dashboard's "Pending requests" list.\n\nCharlie's Cuts`;
+    await sendMail({ to: hd.contact_email, subject, text });
+  } catch (err) {
+    console.error('notifyStylistOfNewRequest failed:', err.message);
+  }
+}
+
 function requireHairdresser(req, res, next) {
   if (!req.session.hairdresserId) return res.status(401).json({ error: 'Not logged in' });
   const hd = db.prepare('SELECT is_active FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
@@ -104,6 +126,7 @@ router.post('/', (req, res) => {
   `).run(slotId, slot.hairdresser_id, customerId, name.trim(), email.trim().toLowerCase(), (customerPhone || '').trim(), accessToken, note || '');
 
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(info.lastInsertRowid);
+  notifyStylistOfNewRequest(req, booking);
   res.json(bookingWithSlot(booking));
 });
 

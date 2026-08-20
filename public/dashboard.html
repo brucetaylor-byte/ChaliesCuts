@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stylist Dashboard</title>
-<link rel="stylesheet" href="/css/style.css?v=13">
+<link rel="stylesheet" href="/css/style.css?v=14">
 </head>
 <body class="has-bottom-nav">
 <header class="site">
@@ -80,6 +80,9 @@
         <input id="snapchat" placeholder="https://snapchat.com/add/...">
         <label for="website">Website URL</label>
         <input id="website" placeholder="https://...">
+        <label for="contactEmail">Booking notification email</label>
+        <input id="contactEmail" type="email" placeholder="you@example.com">
+        <p class="muted" style="margin-top:-0.5rem;">New booking requests are emailed here as they come in, so keep this current.</p>
         <div style="margin-top:1rem;">
           <button type="submit">Save profile</button>
         </div>
@@ -134,6 +137,9 @@
         <input id="newStylistUsername" required placeholder="e.g. sam">
         <label for="newStylistPassword">Temporary password</label>
         <input id="newStylistPassword" type="password" required minlength="6" placeholder="6+ characters">
+        <label for="newStylistEmail">Booking notification email</label>
+        <input id="newStylistEmail" type="email" required placeholder="their-own@example.com">
+        <p class="muted" style="margin-top:-0.5rem;">New booking requests for this stylist get emailed here - use an inbox they check themselves, since each stylist manages their own customer list. They can change it later from their own Profile tab.</p>
         <div style="margin-top:1rem;">
           <button type="submit">Add stylist</button>
         </div>
@@ -345,6 +351,7 @@ async function init() {
   document.getElementById('tiktok').value = me.tiktok_url || '';
   document.getElementById('snapchat').value = me.snapchat_url || '';
   document.getElementById('website').value = me.website_url || '';
+  document.getElementById('contactEmail').value = me.contact_email || '';
   if (me.is_admin) {
     document.getElementById('adminTabBtn').style.display = '';
     loadCustomerManageList();
@@ -829,7 +836,8 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
       facebook_url: document.getElementById('facebook').value,
       tiktok_url: document.getElementById('tiktok').value,
       snapchat_url: document.getElementById('snapchat').value,
-      website_url: document.getElementById('website').value
+      website_url: document.getElementById('website').value,
+      contact_email: document.getElementById('contactEmail').value
     });
     msg.textContent = 'Saved.';
     msg.className = 'success';
@@ -865,7 +873,8 @@ document.getElementById('addStylistForm').addEventListener('submit', async (e) =
     const created = await api('POST', '/api/hairdressers', {
       display_name: document.getElementById('newStylistName').value,
       username: document.getElementById('newStylistUsername').value,
-      password: document.getElementById('newStylistPassword').value
+      password: document.getElementById('newStylistPassword').value,
+      contact_email: document.getElementById('newStylistEmail').value
     });
     msg.textContent = `Added "${created.display_name}" - they can log in with username "${created.username}" and the password you just set. They should change it from their own profile page once they log in.`;
     msg.className = 'success';

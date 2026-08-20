@@ -101,6 +101,7 @@ function ensureColumn(table, column, definition) {
 ensureColumn('hairdressers', 'snapchat_url', "TEXT DEFAULT ''");
 ensureColumn('hairdressers', 'is_admin', 'INTEGER DEFAULT 0');
 ensureColumn('hairdressers', 'is_active', 'INTEGER DEFAULT 1');
+ensureColumn('hairdressers', 'contact_email', "TEXT DEFAULT ''");
 ensureColumn('bookings', 'customer_phone', "TEXT DEFAULT ''");
 ensureColumn('availability_slots', 'block_id', 'INTEGER');
 

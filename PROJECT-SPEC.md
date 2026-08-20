@@ -78,6 +78,17 @@ configured, the app runs exactly the same way but skips sending email;
 customers still get a private link to check their booking status at any
 time.
 
+**New booking request notifications (per stylist).** Each stylist has their
+own booking notification email — set by Charlie when he registers them (see
+"Managing stylists" below), and editable by the stylist themselves afterward
+from their own Profile tab. Whenever a customer requests a slot, that
+stylist's own notification email gets a message with the customer's details
+and the requested time, so they know to check the dashboard's "Pending
+requests" list — bookings for each stylist land in that stylist's own inbox,
+not one shared one. This uses the same Gmail sending setup as the
+confirmation emails above and is skipped the same way if it isn't
+configured, or if a given stylist hasn't set a notification email yet.
+
 **Accounts and privacy.** Customers can book anonymously — they get a
 private, unguessable link (not tied to a login) to check status or cancel
 later. Optionally, they can create a lightweight account (email + password)
@@ -102,12 +113,15 @@ tab, hidden from everyone else, with three panels:
   "Reset password" button that sets a new password directly (no need to
   know the old one — useful if someone's locked out), and a "Remove" button
   on everyone except Charlie's own admin row, which can never be removed.
-- *Add a stylist* — a form (display name, username, temporary password)
-  that creates a brand-new stylist login with its own calendar,
-  availability, bookings, gallery and profile — identical day-to-day
-  features to Charlie and Angus, just without admin access. New stylists
-  show up in the Active stylists list and the dashboard's calendar toggle
-  immediately, no page reload needed.
+- *Add a stylist* — a form (display name, username, temporary password, and
+  a booking notification email) that creates a brand-new stylist login with
+  its own calendar, availability, bookings, gallery and profile — identical
+  day-to-day features to Charlie and Angus, just without admin access. The
+  notification email is required at creation (it's where that stylist's new
+  booking requests get sent — see "New booking request notifications"
+  above) and the stylist can update it themselves later from their own
+  Profile tab. New stylists show up in the Active stylists list and the
+  dashboard's calendar toggle immediately, no page reload needed.
 - *Customer accounts* — everyone who's created a customer login (not
   people who've only booked anonymously), with "Reset password" and
   "Delete" per account.
@@ -152,9 +166,10 @@ own Profile tab after logging in for the first time.
 ## 5. Data model (SQLite)
 
 - **hairdressers** — one row per stylist: login credentials, display name,
-  bio, social links, an `is_admin` flag (only ever set for Charlie), and an
-  `is_active` flag used to soft-remove a stylist without deleting their row
-  or any of their linked data.
+  bio, social links, a `contact_email` used as the destination for that
+  stylist's own new-booking-request notifications, an `is_admin` flag (only
+  ever set for Charlie), and an `is_active` flag used to soft-remove a
+  stylist without deleting their row or any of their linked data.
 - **customers** — optional accounts for people who choose to sign up rather
   than book anonymously.
 - **availability_blocks** — the date range / days-of-week / time-window
@@ -247,6 +262,17 @@ reasonably small follow-up build, reusing the existing email sending setup
 
 ## 9. Known follow-ups / open items
 
+- **Email sending isn't turned on for the live site yet.** `GMAIL_USER` /
+  `GMAIL_APP_PASSWORD` haven't been added to Railway's environment variables
+  (only `DATA_DIR`, `SESSION_SECRET` and `NODE_ENV` are set there), so
+  neither the booking confirmation emails nor the new per-stylist booking
+  request notifications are actually sending on the live site yet - see
+  README "Booking confirmation emails" for how to add them.
+- Charlie and Angus predate the per-stylist notification email feature, so
+  their `contact_email` is blank until they each set one from their own
+  Profile tab - until then they won't get emailed about new booking
+  requests for their own calendar (they'll still see them by checking the
+  dashboard's "Pending requests" list).
 - Angus's mobile number still needs to be added to the booking-confirmation
   email (currently a placeholder in `routes/bookings.js`).
 - Bruce has flagged that the customer booking flow ("Available slots" →

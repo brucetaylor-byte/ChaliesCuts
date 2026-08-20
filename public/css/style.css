@@ -173,6 +173,12 @@ header.site.slim nav.site-nav { flex: 1; justify-content: flex-end; font-size: 0
   display: flex;
   align-items: center;
   gap: 0.85rem;
+  /* Without this, a flex item's automatic min-width defaults to its content's
+     min-content size - since this row is also a CSS Grid item of
+     .hairdresser-list, that could stretch the whole card (and the page)
+     wider than the viewport on narrow phones, even though the bio text
+     inside already truncates with an ellipsis. */
+  min-width: 0;
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--line);

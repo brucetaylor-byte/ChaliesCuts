@@ -42,7 +42,7 @@ router.get('/', (req, res) => {
 // availability, bookings and gallery just like any other stylist - it's
 // just not an admin itself, so it won't see this "add a stylist" feature.
 router.post('/', requireAdmin, (req, res) => {
-  const { username, password, display_name } = req.body || {};
+  const { username, password, display_name, contact_email } = req.body || {};
   if (!username || !password || !display_name) {
     return res.status(400).json({ error: 'Username, password and display name are required' });
   }
@@ -53,15 +53,26 @@ router.post('/', requireAdmin, (req, res) => {
   if (!/^[a-z0-9_-]{3,20}$/.test(normalizedUsername)) {
     return res.status(400).json({ error: 'Username should be 3-20 characters: letters, numbers, - or _ only' });
   }
+  // Every stylist gets their own booking-notification email, set here by
+  // Charlie when the account is created - this is where new booking requests
+  // get emailed, so each stylist manages their own customer list rather than
+  // everything funnelling through one inbox.
+  const normalizedEmail = (contact_email || '').trim().toLowerCase();
+  if (!normalizedEmail) {
+    return res.status(400).json({ error: "A booking notification email is required for the new stylist" });
+  }
+  if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+    return res.status(400).json({ error: 'Please provide a valid booking notification email' });
+  }
   const existing = db.prepare('SELECT id FROM hairdressers WHERE username = ?').get(normalizedUsername);
   if (existing) {
     return res.status(409).json({ error: 'That username is already taken' });
   }
   const password_hash = bcrypt.hashSync(password, 10);
   const info = db.prepare(`
-    INSERT INTO hairdressers (username, password_hash, display_name, bio, is_admin)
-    VALUES (?, ?, ?, '', 0)
-  `).run(normalizedUsername, password_hash, display_name.trim());
+    INSERT INTO hairdressers (username, password_hash, display_name, bio, is_admin, contact_email)
+    VALUES (?, ?, ?, '', 0, ?)
+  `).run(normalizedUsername, password_hash, display_name.trim(), normalizedEmail);
   const created = db.prepare(`SELECT ${PUBLIC_FIELDS} FROM hairdressers WHERE id = ?`).get(info.lastInsertRowid);
   res.json({ ...created, is_admin: !!created.is_admin });
 });
@@ -131,11 +142,21 @@ router.get('/:id', (req, res) => {
   res.json({ ...hd, is_admin: !!hd.is_admin });
 });
 
-// Logged-in hairdresser: update own profile / bio / socials
+// Logged-in hairdresser: update own profile / bio / socials / booking notification email
 router.put('/me', requireHairdresser, (req, res) => {
-  const { display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url } = req.body || {};
+  const { display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url, contact_email } = req.body || {};
   const current = db.prepare('SELECT * FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
-  db.prepare(`UPDATE hairdressers SET display_name = ?, bio = ?, instagram_url = ?, facebook_url = ?, tiktok_url = ?, snapchat_url = ?, website_url = ? WHERE id = ?`)
+
+  let normalizedContactEmail = current.contact_email;
+  if (contact_email !== undefined) {
+    const trimmed = contact_email.trim().toLowerCase();
+    if (trimmed && !/^\S+@\S+\.\S+$/.test(trimmed)) {
+      return res.status(400).json({ error: 'Please provide a valid booking notification email, or leave it blank' });
+    }
+    normalizedContactEmail = trimmed;
+  }
+
+  db.prepare(`UPDATE hairdressers SET display_name = ?, bio = ?, instagram_url = ?, facebook_url = ?, tiktok_url = ?, snapchat_url = ?, website_url = ?, contact_email = ? WHERE id = ?`)
     .run(
       display_name ?? current.display_name,
       bio ?? current.bio,
@@ -144,9 +165,10 @@ router.put('/me', requireHairdresser, (req, res) => {
       tiktok_url ?? current.tiktok_url,
       snapchat_url ?? current.snapchat_url,
       website_url ?? current.website_url,
+      normalizedContactEmail,
       req.session.hairdresserId
     );
-  const updated = db.prepare(`SELECT ${PUBLIC_FIELDS} FROM hairdressers WHERE id = ?`).get(req.session.hairdresserId);
+  const updated = db.prepare(`SELECT ${PUBLIC_FIELDS}, contact_email FROM hairdressers WHERE id = ?`).get(req.session.hairdresserId);
   res.json({ ...updated, is_admin: !!updated.is_admin });
 });
 

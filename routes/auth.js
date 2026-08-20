@@ -44,7 +44,7 @@ router.put('/hairdresser/password', (req, res) => {
 
 router.get('/hairdresser/me', (req, res) => {
   if (!req.session.hairdresserId) return res.status(401).json({ error: 'Not logged in' });
-  const hd = db.prepare('SELECT id, username, display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url, is_admin, is_active FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
+  const hd = db.prepare('SELECT id, username, display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url, contact_email, is_admin, is_active FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
   if (!hd || !hd.is_active) {
     req.session.hairdresserId = null;
     return res.status(401).json({ error: 'Not logged in' });
