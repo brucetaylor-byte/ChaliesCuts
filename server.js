@@ -1,5 +1,15 @@
 require('dotenv').config();
 
+// Some hosts (Railway included) can't route outbound IPv6, but Node will
+// still try an IPv6 address first if a hostname resolves to both (e.g.
+// smtp.gmail.com) - this showed up as ENETUNREACH errors when sending
+// booking emails even after telling nodemailer's transport to use IPv4
+// only. Forcing IPv4-first at the process level (affects every dns.lookup()
+// call, which is what nodemailer/net.connect use under the hood) is the
+// more reliable fix.
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
