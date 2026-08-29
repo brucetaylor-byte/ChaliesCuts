@@ -9,7 +9,7 @@ const router = express.Router();
 // Shared salon address/contact block, appended to booking-confirmed emails
 // so a customer knows exactly where to show up without having to ask.
 const VENUE_ADDRESS = '36 Wyralla Crescent\nGisborne, 3437';
-const VENUE_CONTACTS = 'Contact either Charlie on 0493 032 545 or Angus on [ADD ANGUS\'S NUMBER]';
+const VENUE_CONTACTS = 'Contact Charlie on 0493 032 545 for further details';
 
 // Fire-and-forget booking status email. Never throws - a template or send
 // failure is logged and swallowed so it can never break the request that
@@ -58,6 +58,26 @@ async function notifyStylistOfNewRequest(req, booking) {
     await sendMail({ to: hd.contact_email, subject, text });
   } catch (err) {
     console.error('notifyStylistOfNewRequest failed:', err.message);
+  }
+}
+
+// Fire-and-forget: tells the stylist a customer has cancelled one of their
+// bookings, sent to whichever email Charlie set up for them (contact_email) -
+// so they notice a slot has reopened without having to keep the dashboard
+// open. Only fired for customer-initiated cancellations (see /cancel below) -
+// if the stylist cancelled it themselves they obviously already know. Same
+// swallow-errors behaviour as the other notification helpers.
+async function notifyStylistOfCancellation(req, booking) {
+  try {
+    if (!booking.slot || !booking.hairdresser) return;
+    const hd = db.prepare('SELECT display_name, contact_email FROM hairdressers WHERE id = ?').get(booking.hairdresser_id);
+    if (!hd || !hd.contact_email) return;
+    const when = `${formatDateForEmail(booking.slot.date)} at ${formatTimeForEmail(booking.slot.start_time)}`;
+    const subject = `Booking cancelled - ${formatDateForEmail(booking.slot.date)}`;
+    const text = `Hi ${hd.display_name},\n\n${booking.customer_name} has cancelled their ${when} booking, so that slot is open again.\n\nCharlie's Cuts`;
+    await sendMail({ to: hd.contact_email, subject, text });
+  } catch (err) {
+    console.error('notifyStylistOfCancellation failed:', err.message);
   }
 }
 
@@ -163,6 +183,22 @@ router.post('/cancel', (req, res) => {
     return res.status(409).json({ error: 'This booking is already ' + booking.status });
   }
 
+  // Customers can only cancel online up to 24 hours before their slot -
+  // any closer than that and there's no realistic chance of the slot being
+  // rebooked, so it needs to go through Charlie directly instead. This
+  // doesn't apply when the stylist is the one cancelling (e.g. a phone
+  // booking they need to pull at short notice).
+  if (!cancelledByHairdresser) {
+    const slot = db.prepare('SELECT * FROM availability_slots WHERE id = ?').get(booking.slot_id);
+    if (slot) {
+      const slotStart = new Date(`${slot.date}T${slot.start_time}:00`);
+      const hoursUntilSlot = (slotStart - new Date()) / (1000 * 60 * 60);
+      if (hoursUntilSlot < 24) {
+        return res.status(409).json({ error: 'Bookings can only be cancelled online up to 24 hours beforehand. Please contact Charlie on 0493 032 545 if you need to cancel sooner.' });
+      }
+    }
+  }
+
   const runAll = db.transaction(() => {
     db.prepare(`UPDATE bookings SET status = 'cancelled', cancelled_at = datetime('now') WHERE id = ?`).run(booking.id);
     db.prepare(`UPDATE availability_slots SET status = 'open' WHERE id = ?`).run(booking.slot_id);
@@ -172,8 +208,14 @@ router.post('/cancel', (req, res) => {
   const updated = db.prepare('SELECT * FROM bookings WHERE id = ?').get(booking.id);
   const full = bookingWithSlot(updated);
   // Only email the customer when the stylist cancelled it - if the customer
-  // cancelled it themselves they obviously already know.
-  if (cancelledByHairdresser) notifyBookingEmail(req, full, 'cancelled');
+  // cancelled it themselves they obviously already know. The other way
+  // round: only alert the stylist when the customer cancelled it - a slot
+  // just reopened that they'll want to know about.
+  if (cancelledByHairdresser) {
+    notifyBookingEmail(req, full, 'cancelled');
+  } else {
+    notifyStylistOfCancellation(req, full);
+  }
   res.json(full);
 });
 

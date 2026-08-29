@@ -117,6 +117,12 @@ function renderLoggedIn() {
   });
 }
 
+// Bookings can only be cancelled online up to 24 hours before the slot -
+// mirrors the same cutoff the server enforces in POST /api/bookings/cancel.
+function hoursUntilSlot(b) {
+  return (new Date(`${b.slot.date}T${b.slot.start_time}:00`) - new Date()) / (1000 * 60 * 60);
+}
+
 async function loadBookings() {
   const el = document.getElementById('bookingsArea');
   try {
@@ -125,17 +131,27 @@ async function loadBookings() {
       el.innerHTML = '<p class="muted">No bookings yet.</p>';
       return;
     }
-    el.innerHTML = bookings.map(b => `
+    el.innerHTML = bookings.map(b => {
+      const isActive = b.status === 'pending' || b.status === 'approved';
+      const canCancel = isActive && hoursUntilSlot(b) >= 24;
+      const tooLateToCancel = isActive && !canCancel;
+      return `
       <div class="card">
         <div><span class="badge ${b.status}">${b.status}</span></div>
         <p><strong>${esc(b.hairdresser.display_name)}</strong> &mdash; ${fmtDate(b.slot.date)} at ${fmtTime(b.slot.start_time)}</p>
-        ${(b.status === 'pending' || b.status === 'approved') ? `<button class="danger" data-cancel="${b.id}">Cancel</button>` : ''}
+        ${canCancel ? `<button class="danger" data-cancel="${b.id}">Cancel</button>` : ''}
+        ${tooLateToCancel ? `<p class="muted">Within 24 hours of the appointment - call Charlie on 0493 032 545 to cancel.</p>` : ''}
       </div>
-    `).join('');
+    `;
+    }).join('');
     el.querySelectorAll('[data-cancel]').forEach(btn => btn.addEventListener('click', async () => {
       if (!confirm('Cancel this booking?')) return;
-      await api('POST', '/api/bookings/cancel', { bookingId: btn.dataset.cancel });
-      loadBookings();
+      try {
+        await api('POST', '/api/bookings/cancel', { bookingId: btn.dataset.cancel });
+        loadBookings();
+      } catch (e) {
+        alert(e.message);
+      }
     }));
   } catch (e) {
     el.innerHTML = `<p class="error">${esc(e.message)}</p>`;

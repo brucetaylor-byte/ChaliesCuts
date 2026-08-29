@@ -33,9 +33,17 @@ async function load() {
   }
 }
 
+// Bookings can only be cancelled online up to 24 hours before the slot -
+// mirrors the same cutoff the server enforces in POST /api/bookings/cancel.
+function hoursUntilSlot(b) {
+  return (new Date(`${b.slot.date}T${b.slot.start_time}:00`) - new Date()) / (1000 * 60 * 60);
+}
+
 function render(b) {
   const el = document.getElementById('content');
-  const canCancel = b.status === 'pending' || b.status === 'approved';
+  const isActive = b.status === 'pending' || b.status === 'approved';
+  const canCancel = isActive && hoursUntilSlot(b) >= 24;
+  const tooLateToCancel = isActive && !canCancel;
   el.innerHTML = `
     <div class="card">
       <div><span class="badge ${b.status}">${b.status}</span></div>
@@ -43,6 +51,7 @@ function render(b) {
       <p class="muted">Booked as ${esc(b.customer_name)} (${esc(b.customer_email)})</p>
       ${b.note ? `<p class="muted">Note: ${esc(b.note)}</p>` : ''}
       ${canCancel ? `<button class="danger" id="cancelBtn">Cancel booking</button>` : ''}
+      ${tooLateToCancel ? `<p class="muted">This is within 24 hours of your appointment, so it can't be cancelled online any more &mdash; call Charlie on 0493 032 545 if you need to.</p>` : ''}
       <p id="msg"></p>
     </div>
   `;
