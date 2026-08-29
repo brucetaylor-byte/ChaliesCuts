@@ -180,7 +180,7 @@ let allHairdressers = [];
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 let blockCounter = 0;
-let expandedWeekKey = null; // which week (by its Sunday date) is currently expanded in "Your availability"
+let expandedWeekKey = null; // which week (by its Monday date) is currently expanded in "Your availability"
 
 // ---------- Bottom-tab screen switching ----------
 function showScreen(name) {
@@ -543,10 +543,14 @@ async function loadMyCalendar() {
 }
 
 // Shared by "My calendar" and "Other stylist calendar" - breaks a flat slot
-// list into This week (always expanded), Next week (collapsed), and every
-// week beyond that (collapsed, one row each under "Later availability").
-// Mirrors the same pattern customers see on the public booking page, so a
-// long list of open weeks doesn't turn into one giant wall of days.
+// list into a fixed run of "Week beginning <date>" sections starting with
+// the current week, so the calendar reads the same way no matter what day
+// it's viewed on (no more "this week / next week / later" boundaries to get
+// confused about). Capped a few weeks out so a long run of open availability
+// doesn't turn into one giant wall of days; the current week starts expanded,
+// the rest collapsed until clicked.
+const CALENDAR_WEEKS_TO_SHOW = 4;
+
 function renderCalendarWeeks(containerId, slots, clickable, state) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -557,59 +561,37 @@ function renderCalendarWeeks(containerId, slots, clickable, state) {
 
   const today = new Date().toISOString().slice(0, 10);
   const thisWeekStart = startOfWeek(today);
-  const thisWeekEnd = addDays(thisWeekStart, 6);
-  const nextWeekStart = addDays(thisWeekStart, 7);
-  const nextWeekEnd = addDays(nextWeekStart, 6);
 
-  const thisWeekSlots = slots.filter(s => s.date <= thisWeekEnd);
-  const nextWeekSlots = slots.filter(s => s.date >= nextWeekStart && s.date <= nextWeekEnd);
-  const laterSlots = slots.filter(s => s.date > nextWeekEnd);
-
-  const byLaterWeek = {};
-  for (const s of laterSlots) {
-    const wk = startOfWeek(s.date);
-    (byLaterWeek[wk] = byLaterWeek[wk] || []).push(s);
+  const weeks = [];
+  for (let i = 0; i < CALENDAR_WEEKS_TO_SHOW; i++) {
+    const start = addDays(thisWeekStart, i * 7);
+    const end = addDays(start, 6);
+    weeks.push({ start, end, slots: slots.filter(s => s.date >= start && s.date <= end) });
   }
-  const laterWeekKeys = Object.keys(byLaterWeek).sort();
+  const shownEnd = weeks[weeks.length - 1].end;
+  const laterCount = slots.filter(s => s.date > shownEnd).length;
 
-  let html = `
-    <div class="card week-section">
-      <h3 class="week-section-title">This week</h3>
-      ${renderCalendar(thisWeekSlots, !clickable)}
-    </div>
-  `;
+  // state.key null/undefined means "use the default" (current week open);
+  // 'none' is the explicit "everything collapsed" state after closing it.
+  const openKey = (state.key === null || state.key === undefined) ? thisWeekStart : state.key;
 
-  const nextOpen = state.key === 'next';
-  html += `
-    <div class="week-card">
-      <button type="button" class="week-header" data-weekkey="next" aria-expanded="${nextOpen}">
-        <span>Next week</span>
-        <span class="week-header-meta muted">${nextWeekSlots.length} slot${nextWeekSlots.length === 1 ? '' : 's'} <span class="week-chevron">${nextOpen ? '&#9662;' : '&#9656;'}</span></span>
-      </button>
-      <div class="week-body" style="display:${nextOpen ? 'block' : 'none'};">
-        ${nextOpen ? renderCalendar(nextWeekSlots, !clickable) : ''}
-      </div>
-    </div>
-  `;
-
-  if (laterWeekKeys.length > 0) {
-    html += `<p class="week-later-heading muted">Later availability</p>`;
-    html += laterWeekKeys.map(wk => {
-      const weekEnd = addDays(wk, 6);
-      const weekSlots = byLaterWeek[wk];
-      const isOpen = state.key === wk;
-      return `
-        <div class="week-card">
-          <button type="button" class="week-header" data-weekkey="${wk}" aria-expanded="${isOpen}">
-            <span>${fmtDate(wk)} &ndash; ${fmtDate(weekEnd)}</span>
-            <span class="week-header-meta muted">${weekSlots.length} slot${weekSlots.length === 1 ? '' : 's'} <span class="week-chevron">${isOpen ? '&#9662;' : '&#9656;'}</span></span>
-          </button>
-          <div class="week-body" style="display:${isOpen ? 'block' : 'none'};">
-            ${isOpen ? renderCalendar(weekSlots, !clickable) : ''}
-          </div>
+  let html = weeks.map(wk => {
+    const isOpen = openKey === wk.start;
+    return `
+      <div class="week-card">
+        <button type="button" class="week-header" data-weekkey="${wk.start}" aria-expanded="${isOpen}">
+          <span>Week beginning ${fmtDate(wk.start)}</span>
+          <span class="week-header-meta muted">${wk.slots.length} slot${wk.slots.length === 1 ? '' : 's'} <span class="week-chevron">${isOpen ? '&#9662;' : '&#9656;'}</span></span>
+        </button>
+        <div class="week-body" style="display:${isOpen ? 'block' : 'none'};">
+          ${isOpen ? renderCalendar(wk.slots, !clickable) : ''}
         </div>
-      `;
-    }).join('');
+      </div>
+    `;
+  }).join('');
+
+  if (laterCount > 0) {
+    html += `<p class="week-later-heading muted">+${laterCount} slot${laterCount === 1 ? '' : 's'} further out than the next ${CALENDAR_WEEKS_TO_SHOW} weeks.</p>`;
   }
 
   el.innerHTML = html;
@@ -623,7 +605,7 @@ function renderCalendarWeeks(containerId, slots, clickable, state) {
   el.querySelectorAll('.week-header').forEach(btn => {
     btn.addEventListener('click', () => {
       const key = btn.dataset.weekkey;
-      state.key = (state.key === key) ? null : key;
+      state.key = (openKey === key) ? 'none' : key;
       renderCalendarWeeks(containerId, slots, clickable, state);
     });
   });
@@ -643,43 +625,60 @@ function addDays(dateStr, n) {
   return d.toISOString().slice(0, 10);
 }
 
+// "Your availability" - always shows the same fixed run of "Week beginning
+// <date>" cards (this week plus the next few), each expandable to manage its
+// slots. Weeks with nothing posted yet still show up as an empty card rather
+// than disappearing, so a gap in Charlie's schedule is obvious at a glance
+// instead of just being missing from the list.
+const AVAILABILITY_WEEKS_TO_SHOW = 4;
+
 function renderWeeksList(slots) {
   const el = document.getElementById('availabilityWeeks');
   if (!el) return;
-  if (slots.length === 0) {
-    el.innerHTML = '<p class="muted">No upcoming availability - add some above.</p>';
-    return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const thisWeekStart = startOfWeek(today);
+
+  const weeks = [];
+  for (let i = 0; i < AVAILABILITY_WEEKS_TO_SHOW; i++) {
+    const start = addDays(thisWeekStart, i * 7);
+    const end = addDays(start, 6);
+    weeks.push({ start, end, slots: slots.filter(s => s.date >= start && s.date <= end) });
   }
-  const byWeek = {};
-  for (const s of slots) {
-    const wk = startOfWeek(s.date);
-    (byWeek[wk] = byWeek[wk] || []).push(s);
-  }
-  const weekKeys = Object.keys(byWeek).sort();
-  el.innerHTML = weekKeys.map(wk => {
-    const weekSlots = byWeek[wk];
-    const weekEnd = addDays(wk, 6);
-    const openCount = weekSlots.filter(s => s.status === 'open').length;
-    const bookedCount = weekSlots.length - openCount;
-    const isOpen = wk === expandedWeekKey;
+  const shownEnd = weeks[weeks.length - 1].end;
+  const laterCount = slots.filter(s => s.date > shownEnd).length;
+  const weekSlotsByStart = {};
+  weeks.forEach(wk => { weekSlotsByStart[wk.start] = wk.slots; });
+
+  let html = weeks.map(wk => {
+    const openCount = wk.slots.filter(s => s.status === 'open').length;
+    const bookedCount = wk.slots.length - openCount;
+    const isOpen = wk.start === expandedWeekKey;
+    const meta = wk.slots.length === 0 ? 'No slots yet' : `${openCount} open &middot; ${bookedCount} booked`;
     return `
       <div class="week-card">
-        <button type="button" class="week-header" data-week="${wk}" aria-expanded="${isOpen}">
-          <span>${fmtDate(wk)} &ndash; ${fmtDate(weekEnd)}</span>
-          <span class="week-header-meta muted">${openCount} open &middot; ${bookedCount} booked <span class="week-chevron">${isOpen ? '▾' : '▸'}</span></span>
+        <button type="button" class="week-header" data-week="${wk.start}" aria-expanded="${isOpen}">
+          <span>Week beginning ${fmtDate(wk.start)}</span>
+          <span class="week-header-meta muted">${meta} <span class="week-chevron">${isOpen ? '▾' : '▸'}</span></span>
         </button>
         <div class="week-body" style="display:${isOpen ? 'block' : 'none'};">
           ${isOpen ? `
             <div class="week-actions">
-              <button type="button" class="secondary week-add-btn" data-week-start="${wk}" data-week-end="${weekEnd}">+ Add slots this week</button>
-              ${openCount > 0 ? `<button type="button" class="danger week-remove-btn" data-week="${wk}">Remove all open (${openCount})</button>` : ''}
+              <button type="button" class="secondary week-add-btn" data-week-start="${wk.start}" data-week-end="${wk.end}">+ Add slots this week</button>
+              ${openCount > 0 ? `<button type="button" class="danger week-remove-btn" data-week="${wk.start}">Remove all open (${openCount})</button>` : ''}
             </div>
-            ${renderCalendar(weekSlots, false)}
+            ${wk.slots.length > 0 ? renderCalendar(wk.slots, false) : '<p class="muted">No availability posted for this week.</p>'}
           ` : ''}
         </div>
       </div>
     `;
   }).join('');
+
+  if (laterCount > 0) {
+    html += `<p class="week-later-heading muted">+${laterCount} slot${laterCount === 1 ? '' : 's'} further out than the next ${AVAILABILITY_WEEKS_TO_SHOW} weeks.</p>`;
+  }
+
+  el.innerHTML = html;
 
   el.querySelectorAll('.week-header').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -700,7 +699,7 @@ function renderWeeksList(slots) {
   el.querySelectorAll('.week-remove-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      removeAllOpenInWeek(byWeek[btn.dataset.week]);
+      removeAllOpenInWeek(weekSlotsByStart[btn.dataset.week]);
     });
   });
 }

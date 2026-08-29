@@ -106,8 +106,8 @@ function wireSlotClicks(root) {
   });
 }
 
-// One collapsed-by-default week row, reused for "Next week" and every week
-// beyond it - tap the header to expand and render its slots on demand.
+// One collapsed-by-default week row, reused for every week after the
+// current one - tap the header to expand and render its slots on demand.
 function renderCollapsibleWeek(label, count) {
   return `
     <div class="week-card">
@@ -136,6 +136,11 @@ function wireCollapsibleWeek(cardEl, slots) {
   });
 }
 
+// Always shows exactly this many weeks (starting with the current one), each
+// as its own "Week beginning <date>" section, rather than a variable-length
+// this/next/later split with an ambiguous date range on the last bucket.
+const CUSTOMER_WEEKS_TO_SHOW = 4;
+
 async function loadSlots() {
   const container = document.getElementById('slots');
   try {
@@ -150,40 +155,30 @@ async function loadSlots() {
       return;
     }
 
-    const thisWeekStart = startOfWeek(today);
-    const thisWeekEnd = addDays(thisWeekStart, 6);
-    const nextWeekStart = addDays(thisWeekStart, 7);
-    const nextWeekEnd = addDays(nextWeekStart, 6);
-
-    const thisWeekSlots = openSlots.filter(s => s.date <= thisWeekEnd);
-    const nextWeekSlots = openSlots.filter(s => s.date >= nextWeekStart && s.date <= nextWeekEnd);
-    const laterSlots = openSlots.filter(s => s.date > nextWeekEnd);
-
-    // Later weeks each get their own collapsed row, grouped by week so a
-    // customer can jump straight to the week they want instead of scrolling
-    // past everything in between.
-    const byLaterWeek = {};
-    for (const s of laterSlots) {
-      const wk = startOfWeek(s.date);
-      (byLaterWeek[wk] = byLaterWeek[wk] || []).push(s);
+    const currentWeekStart = startOfWeek(today);
+    const weeks = [];
+    for (let i = 0; i < CUSTOMER_WEEKS_TO_SHOW; i++) {
+      const weekStart = addDays(currentWeekStart, i * 7);
+      const weekEnd = addDays(weekStart, 6);
+      weeks.push({
+        start: weekStart,
+        slots: openSlots.filter(s => s.date >= weekStart && s.date <= weekEnd)
+      });
     }
-    const laterWeekKeys = Object.keys(byLaterWeek).sort();
+    const lastWeekEnd = addDays(weeks[weeks.length - 1].start, 6);
+    const laterCount = openSlots.filter(s => s.date > lastWeekEnd).length;
 
     let html = `
       <div class="card week-section">
-        <h3 class="week-section-title">This week</h3>
-        ${renderDayGroups(thisWeekSlots)}
+        <h3 class="week-section-title">Week beginning ${fmtDate(weeks[0].start)}</h3>
+        ${renderDayGroups(weeks[0].slots)}
       </div>
     `;
 
-    html += renderCollapsibleWeek('Next week', nextWeekSlots.length);
+    html += weeks.slice(1).map(w => renderCollapsibleWeek(`Week beginning ${fmtDate(w.start)}`, w.slots.length)).join('');
 
-    if (laterWeekKeys.length > 0) {
-      html += `<p class="week-later-heading muted">Later availability</p>`;
-      html += laterWeekKeys.map(wk => {
-        const weekEnd = addDays(wk, 6);
-        return renderCollapsibleWeek(`${fmtDate(wk)} &ndash; ${fmtDate(weekEnd)}`, byLaterWeek[wk].length);
-      }).join('');
+    if (laterCount > 0) {
+      html += `<p class="week-later-heading muted">${laterCount} more open slot${laterCount === 1 ? '' : 's'} further out - check back later.</p>`;
     }
 
     container.innerHTML = html;
@@ -192,8 +187,7 @@ async function loadSlots() {
 
     const weekCards = container.querySelectorAll('.week-card');
     weekCards.forEach((cardEl, i) => {
-      const slots = i === 0 ? nextWeekSlots : byLaterWeek[laterWeekKeys[i - 1]];
-      wireCollapsibleWeek(cardEl, slots);
+      wireCollapsibleWeek(cardEl, weeks[i + 1].slots);
     });
   } catch (e) {
     container.innerHTML = `<p class="error">${esc(e.message)}</p>`;
