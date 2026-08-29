@@ -24,15 +24,17 @@ approves or declines the request before it's locked in.
 
 ## What's deliberately left out (v1 scope)
 
-- **No online payment.** Customers pay in person as before. The
-  `bookings` table already has room to add a `payment_status` /
-  `stripe_session_id` style column later if you want to add a deposit via
-  Stripe Checkout - ask and I can wire that in as a follow-up once you have a
-  Stripe account.
+- **No online payment.** Customers pay in person as before. A simple manual
+  "Paid" checkbox exists per approved booking so a stylist can mark that a
+  customer has paid - it doesn't change the booking's status or notify
+  anyone, but a past booking left unpaid stays visible in a "Needs payment"
+  list until it's ticked, so it can't quietly get forgotten. A real
+  deposit-via-Stripe-Checkout flow would be a separate, larger follow-up if
+  ever wanted.
 - **Email notifications are optional and off by default.** Set up
-  `GMAIL_USER` / `GMAIL_APP_PASSWORD` (see "Booking confirmation emails"
-  below) to turn them on. Without that, status is still checked via the
-  private link sent at booking time, or by logging into a customer account.
+  `RESEND_API_KEY` (see "Booking confirmation emails" below) to turn them
+  on. Without that, status is still checked via the private link sent at
+  booking time, or by logging into a customer account.
 - **Sessions are stored in server memory.** Fine for one small server/single
   process. If you ever run more than one server instance behind a load
   balancer, swap in a session store like `connect-sqlite3` or Redis.
@@ -53,18 +55,19 @@ Then open http://localhost:3000 in a browser.
 
 By default the app sends no emails - customers just get a private link to
 check their booking's status. To have the app automatically email customers
-when a booking is confirmed, declined, or cancelled, sent from your own
-Gmail account (free, no domain needed):
+when a booking is confirmed, declined, or cancelled (and stylists when a new
+booking request comes in), sent via Resend (a transactional email API,
+free for the volume this app will ever see):
 
 1. Copy `.env.example` to a new file called `.env` in the project folder.
-2. Follow the instructions inside `.env.example` to create a Gmail "app
-   password" (a 16-character password just for this app - not your normal
-   Gmail login password).
-3. Fill in `GMAIL_USER` and `GMAIL_APP_PASSWORD` in `.env`.
+2. Follow the setup steps inside `.env.example` - create a free Resend
+   account, verify a sending domain (or use the default test sender), and
+   create an API key.
+3. Fill in `RESEND_API_KEY` and `EMAIL_FROM` in `.env`.
 4. Restart the server (`npm start`).
 
 `.env` is already excluded from git, so these credentials never get
-committed or pushed to GitHub. Leave `.env` missing (or those two values
+committed or pushed to GitHub. Leave `.env` missing (or `RESEND_API_KEY`
 blank) and the app runs exactly as before - emails are just skipped, nothing
 breaks.
 
@@ -151,9 +154,8 @@ this small typically stays within that.
      `.env.example`)
    - `SESSION_SECRET` = any long random string (mash the keyboard)
    - `NODE_ENV` = `production`
-   - Optionally `GMAIL_USER` / `GMAIL_APP_PASSWORD` / `EMAIL_FROM_NAME` if
-     you want booking confirmation emails live too (same values as your
-     local `.env`).
+   - Optionally `RESEND_API_KEY` / `EMAIL_FROM` if you want booking
+     confirmation emails live too (same values as your local `.env`).
 6. **Change the service's start command** to `npm run seed && npm start`
    (in service settings, usually under "Deploy"). This safely creates the
    two stylist logins the very first time only - `npm run seed` skips

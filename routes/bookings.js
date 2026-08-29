@@ -240,7 +240,31 @@ router.get('/', requireHairdresser, (req, res) => {
   if (status) { query += ' AND status = ?'; params.push(status); }
   query += ' ORDER BY created_at DESC';
   const rows = db.prepare(query).all(...params);
-  res.json(rows.map(bookingWithSlot));
+  let mapped = rows.map(bookingWithSlot);
+  // A "pending request" for a slot whose time has already passed can never be
+  // approved (there's nothing left to confirm), so it's just dead clutter in
+  // the dashboard's action list rather than something the stylist needs to
+  // decide on. Drop those from the pending view - the row itself is left
+  // alone (still queryable with no status filter) so nothing is lost, it
+  // just stops demanding attention.
+  if (status === 'pending') {
+    const today = new Date().toISOString().slice(0, 10);
+    mapped = mapped.filter(b => !b.slot || b.slot.date >= today);
+  }
+  res.json(mapped);
+});
+
+// Toggle a purely informational "paid" flag on a booking - Charlie's manual
+// process today is crossing a name off his paper schedule once they've paid
+// in person; this is that, digitised. It doesn't change the booking's
+// status or move it out of any list - just marks it for his own reference.
+router.post('/:id/paid', requireHairdresser, (req, res) => {
+  const { paid } = req.body || {};
+  const booking = db.prepare('SELECT * FROM bookings WHERE id = ? AND hairdresser_id = ?').get(req.params.id, req.session.hairdresserId);
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  db.prepare('UPDATE bookings SET paid = ? WHERE id = ?').run(paid ? 1 : 0, booking.id);
+  const updated = db.prepare('SELECT * FROM bookings WHERE id = ?').get(booking.id);
+  res.json(bookingWithSlot(updated));
 });
 
 router.post('/:id/approve', requireHairdresser, (req, res) => {

@@ -72,11 +72,22 @@ customer automatically receives an email confirming the date/time, the
 salon address (36 Wyralla Crescent, Gisborne, 3437), and a contact number
 for each stylist — so they know exactly where to go without having to ask.
 Declined and cancelled bookings also trigger a short notification email.
-Emails are sent via a Gmail account (free, no separate email service
-required) and are entirely optional — if no Gmail credentials are
+Emails are sent via Resend (a transactional email API, free for the volume
+this app will ever see) and are entirely optional — if no Resend API key is
 configured, the app runs exactly the same way but skips sending email;
 customers still get a private link to check their booking status at any
 time.
+
+**Decision: Resend over sending "from Gmail" directly.** The original plan
+was to send booking emails straight from a stylist's own Gmail account
+(free, no separate service). In practice, that meant sending raw SMTP from
+Railway's servers, which turned out to be unreliable — three different
+fixes (a port that timed out, an IPv6 routing dead-end, then the replacement
+port timing out too) each solved one failure only to hit a new one, which is
+a known symptom of cloud hosts throttling/blocking outbound SMTP to fight
+spam abuse. Resend sends over a plain HTTPS API call instead, sidestepping
+that whole class of problem, and its free tier (3,000 emails/month, 100/day)
+covers this app's volume indefinitely.
 
 **New booking request notifications (per stylist).** Each stylist has their
 own booking notification email — set by Charlie when he registers them (see
@@ -85,9 +96,12 @@ from their own Profile tab. Whenever a customer requests a slot, that
 stylist's own notification email gets a message with the customer's details
 and the requested time, so they know to check the dashboard's "Pending
 requests" list — bookings for each stylist land in that stylist's own inbox,
-not one shared one. This uses the same Gmail sending setup as the
+not one shared one. This uses the same Resend sending setup as the
 confirmation emails above and is skipped the same way if it isn't
 configured, or if a given stylist hasn't set a notification email yet.
+Pending requests whose slot time has already passed also drop out of the
+"Pending requests" list automatically (nothing is deleted, they just stop
+demanding action once there's nothing left to confirm).
 
 **Accounts and privacy.** Customers can book anonymously — they get a
 private, unguessable link (not tied to a login) to check status or cancel
@@ -146,9 +160,18 @@ own Profile tab after logging in for the first time.
 
 ## 4. What's deliberately out of scope (v1)
 
-- **No online payments.** Everything is pay-in-person, as it is today. The
-  `bookings` table has room to add a `payment_status` column later if a
-  deposit-via-Stripe-Checkout flow is ever wanted.
+- **No online payments.** Everything is pay-in-person, as it is today. A
+  simple manual `paid` checkbox exists per approved booking (in "Upcoming
+  bookings" and in the calendar's slot detail view) so a stylist can mark
+  that a customer has paid in person — the digital equivalent of crossing a
+  name off a paper schedule. Marking it doesn't change the booking's status
+  or notify the customer, but it does control one thing: a "Needs payment"
+  panel on the dashboard lists every past approved booking that hasn't been
+  marked paid yet, so it stays visible and asking for a decision (collect
+  payment, or just tick it) until it's ticked — unlike a plain informational
+  tag, it can't quietly get lost once the appointment's in the past. A real
+  deposit-via-Stripe-Checkout flow would be a separate, larger piece of work
+  if ever wanted.
 - **No way to transfer or revoke admin status** from the dashboard — Charlie
   is permanently the one admin account (removing/reactivating regular
   stylists is supported; see section 3).
@@ -190,7 +213,8 @@ own Profile tab after logging in for the first time.
   passwords hashed with `bcryptjs`.
 - **Database:** SQLite via `better-sqlite3` — a single file
   (`data/booking.db`), no separate database server to run or pay for.
-- **Email:** `nodemailer` over Gmail SMTP, optional and off by default.
+- **Email:** Resend (transactional email API over HTTPS), optional and off
+  by default.
 - **File uploads:** `multer`, storing gallery photos under `uploads/`.
 - **Frontend:** plain HTML/CSS/JS served as static files — no framework, no
   build step, no bundler. Mobile-first, single-column responsive layout.
@@ -262,12 +286,11 @@ reasonably small follow-up build, reusing the existing email sending setup
 
 ## 9. Known follow-ups / open items
 
-- **Email sending isn't turned on for the live site yet.** `GMAIL_USER` /
-  `GMAIL_APP_PASSWORD` haven't been added to Railway's environment variables
-  (only `DATA_DIR`, `SESSION_SECRET` and `NODE_ENV` are set there), so
-  neither the booking confirmation emails nor the new per-stylist booking
-  request notifications are actually sending on the live site yet - see
-  README "Booking confirmation emails" for how to add them.
+- **Switching email over to Resend, in progress.** `RESEND_API_KEY` (and
+  `EMAIL_FROM`) need adding to Railway's environment variables to replace
+  the old `GMAIL_USER`/`GMAIL_APP_PASSWORD` pair - see `.env.example` for
+  setup steps (free Resend account, verify a sending domain, create an API
+  key).
 - Charlie and Angus predate the per-stylist notification email feature, so
   their `contact_email` is blank until they each set one from their own
   Profile tab - until then they won't get emailed about new booking

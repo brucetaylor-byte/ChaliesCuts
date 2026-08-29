@@ -70,10 +70,10 @@ async function loadProfile() {
   }
 }
 
-// Weeks run Sunday-Saturday, matching the stylist's own week grouping.
+// Weeks run Monday-Sunday, matching the stylist's own week grouping.
 function startOfWeek(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() - d.getDay());
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back up to the Monday that starts this week
   return d.toISOString().slice(0, 10);
 }
 function addDays(dateStr, n) {

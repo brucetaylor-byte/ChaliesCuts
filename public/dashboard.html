@@ -24,6 +24,12 @@
     </div>
 
     <div class="card">
+      <h2>Needs payment</h2>
+      <p class="muted">Past appointments that haven't been marked paid yet.</p>
+      <div id="needsPayment"><p class="muted">Loading...</p></div>
+    </div>
+
+    <div class="card">
       <h2>Upcoming bookings</h2>
       <p class="muted">Everyone booked in from today onward - confirmed or still awaiting your approval.</p>
       <div id="upcomingBookings"><p class="muted">Loading...</p></div>
@@ -363,6 +369,7 @@ async function init() {
 
   loadPending();
   loadUpcomingBookings();
+  loadNeedsPayment();
   loadMyCalendar();
   loadMyGallery();
 }
@@ -388,10 +395,70 @@ async function loadUpcomingBookings() {
         </div>
         <div>${contactLine(b)}</div>
         ${b.note ? `<div class="muted">Note: ${esc(b.note)}</div>` : ''}
+        ${b.status === 'approved' ? `
+          <label style="display:flex; align-items:center; gap:0.4rem; margin-top:0.5rem; cursor:pointer;">
+            <input type="checkbox" data-paid="${b.id}" ${b.paid ? 'checked' : ''}>
+            <span class="muted">Paid</span>
+          </label>
+        ` : ''}
       </div>
     `).join('');
+    el.querySelectorAll('[data-paid]').forEach(cb => cb.addEventListener('change', () => togglePaid(cb)));
   } catch (e) {
     el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+// Approved appointments whose time has already passed, that haven't been
+// marked paid yet - the digital version of a name that's still on Charlie's
+// paper schedule because he hasn't crossed it out. Unlike expired *pending*
+// requests (which drop out of view entirely - see routes/bookings.js -
+// because there's nothing left to decide on those), a past *approved*
+// booking still needs a real-world follow-up (collect payment, or just tick
+// it once he remembers), so it stays visible here until it's marked paid.
+async function loadNeedsPayment() {
+  const el = document.getElementById('needsPayment');
+  try {
+    const bookings = await api('GET', '/api/bookings');
+    const today = new Date().toISOString().slice(0, 10);
+    const unpaid = bookings.filter(b =>
+      b.status === 'approved' && b.slot && b.slot.date < today && !b.paid
+    );
+    unpaid.sort((a, b) => (a.slot.date + a.slot.start_time).localeCompare(b.slot.date + b.slot.start_time));
+    if (unpaid.length === 0) {
+      el.innerHTML = '<p class="muted">Nothing outstanding.</p>';
+      return;
+    }
+    el.innerHTML = unpaid.map(b => `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:0.5rem; flex-wrap:wrap;">
+          <strong>${fmtDate(b.slot.date)} at ${fmtTime(b.slot.start_time)}</strong>
+        </div>
+        <div>${contactLine(b)}</div>
+        <label style="display:flex; align-items:center; gap:0.4rem; margin-top:0.5rem; cursor:pointer;">
+          <input type="checkbox" data-paid="${b.id}">
+          <span class="muted">Paid</span>
+        </label>
+      </div>
+    `).join('');
+    el.querySelectorAll('[data-paid]').forEach(cb => cb.addEventListener('change', () => togglePaid(cb)));
+  } catch (e) {
+    el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+// Shared by both places a "Paid" checkbox appears (Upcoming bookings and
+// Needs payment) plus the calendar slot modal - keeps the toggle, revert-on-
+// failure, and refresh behaviour consistent wherever it's ticked.
+async function togglePaid(checkbox) {
+  const id = checkbox.dataset.paid;
+  const wasChecked = checkbox.checked;
+  try {
+    await api('POST', `/api/bookings/${id}/paid`, { paid: wasChecked });
+    loadNeedsPayment();
+  } catch (e) {
+    checkbox.checked = !wasChecked;
+    alert(e.message);
   }
 }
 
@@ -433,6 +500,7 @@ async function decide(id, action) {
     await api('POST', `/api/bookings/${id}/${action}`);
     loadPending();
     loadUpcomingBookings();
+    loadNeedsPayment();
     loadMyCalendar();
   } catch (e) {
     alert(e.message);
@@ -562,9 +630,10 @@ function renderCalendarWeeks(containerId, slots, clickable, state) {
 }
 
 // ---------- "Your availability" - grouped by calendar week, expand to manage slots ----------
+// Weeks run Monday-Sunday.
 function startOfWeek(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() - d.getDay()); // back up to the Sunday that starts this week
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back up to the Monday that starts this week
   return d.toISOString().slice(0, 10);
 }
 
@@ -685,6 +754,7 @@ document.getElementById('slotModalOverlay').addEventListener('click', (e) => {
 function refreshAfterSlotChange() {
   loadPending();
   loadUpcomingBookings();
+  loadNeedsPayment();
   loadMyCalendar();
 }
 
@@ -766,6 +836,12 @@ async function openSlotModal(slotId, status, date, startTime) {
         <div><span class="badge ${b.status}">${b.status}</span></div>
         <p>${contactLine(b)}</p>
         ${b.note ? `<p class="muted">Note: ${esc(b.note)}</p>` : ''}
+        ${b.status === 'approved' ? `
+          <label style="display:flex; align-items:center; gap:0.4rem; margin-top:0.5rem; cursor:pointer;">
+            <input type="checkbox" data-paid="${b.id}" ${b.paid ? 'checked' : ''}>
+            <span class="muted">Paid</span>
+          </label>
+        ` : ''}
         <div class="row" style="margin-top:1rem;">
           ${actions.join('')}
           <button type="button" class="secondary" id="modalCancelBtn">Close</button>
@@ -773,6 +849,8 @@ async function openSlotModal(slotId, status, date, startTime) {
         <p id="manualMsg"></p>
       `;
       document.getElementById('modalCancelBtn').addEventListener('click', closeSlotModal);
+      const paidCheckbox = box.querySelector('[data-paid]');
+      if (paidCheckbox) paidCheckbox.addEventListener('change', () => togglePaid(paidCheckbox));
       const approveBtn = box.querySelector('[data-modal-approve]');
       if (approveBtn) approveBtn.addEventListener('click', async () => {
         try {

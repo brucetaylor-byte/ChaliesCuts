@@ -103,6 +103,7 @@ ensureColumn('hairdressers', 'is_admin', 'INTEGER DEFAULT 0');
 ensureColumn('hairdressers', 'is_active', 'INTEGER DEFAULT 1');
 ensureColumn('hairdressers', 'contact_email', "TEXT DEFAULT ''");
 ensureColumn('bookings', 'customer_phone', "TEXT DEFAULT ''");
+ensureColumn('bookings', 'paid', 'INTEGER DEFAULT 0');
 ensureColumn('availability_slots', 'block_id', 'INTEGER');
 
 // One-time backfill: availability_slots created before the "blocks" feature
