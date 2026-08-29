@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Gallery</title>
-<link rel="stylesheet" href="/css/style.css?v=14">
+<link rel="stylesheet" href="/css/style.css?v=15">
 </head>
 <body>
 <header class="site">
@@ -19,22 +19,29 @@
   <div id="gallery" class="gallery-grid"><p class="muted">Loading...</p></div>
 </main>
 <footer class="site"><a href="/login.html" id="stylistFooterLink">Stylist login</a></footer>
-<script src="/js/api.js?v=3"></script>
+<script src="/js/api.js?v=4"></script>
 <script>
 async function load() {
   const el = document.getElementById('gallery');
   try {
     const photos = await api('GET', '/api/gallery');
     if (photos.length === 0) {
-      el.innerHTML = '<p class="muted">No photos yet.</p>';
+      el.innerHTML = '<p class="muted">No photos or videos yet.</p>';
       return;
     }
     el.innerHTML = photos.map(p => `
       <div>
-        <img src="${p.url}" alt="${esc(p.caption)}" loading="lazy">
+        <button type="button" class="gallery-thumb" data-url="${p.url}" data-type="${p.media_type}" data-caption="${esc(p.caption)}" aria-label="${p.media_type === 'video' ? 'Play video' : 'View larger photo'}">
+          ${p.media_type === 'video'
+            ? `<video src="${p.url}" muted playsinline preload="metadata"></video><span class="gallery-play-icon">&#9658;</span>`
+            : `<img src="${p.url}" alt="${esc(p.caption)}" loading="lazy">`}
+        </button>
         ${p.caption ? `<div class="muted">${esc(p.caption)}</div>` : ''}
       </div>
     `).join('');
+    el.querySelectorAll('.gallery-thumb').forEach(btn => {
+      btn.addEventListener('click', () => openLightbox(btn.dataset.url, btn.dataset.type, btn.dataset.caption));
+    });
   } catch (e) {
     el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
   }

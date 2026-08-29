@@ -48,6 +48,43 @@ function isValidAuMobile(phone) {
   return /^(?:0|\+?61)4\d{8}$/.test(digitsAndPlus);
 }
 
+// Shared lightbox for gallery thumbnails (photos and videos) - injects its
+// own overlay into the page the first time it's used, so any page just needs
+// to call openLightbox(url, mediaType, caption) from a click handler.
+function openLightbox(url, mediaType, caption) {
+  let overlay = document.getElementById('lightboxOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'lightboxOverlay';
+    overlay.className = 'lightbox-overlay';
+    overlay.hidden = true;
+    overlay.innerHTML = `
+      <button type="button" class="lightbox-close" aria-label="Close">&times;</button>
+      <div class="lightbox-content"></div>
+      <div class="lightbox-caption"></div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeLightbox(); });
+    overlay.querySelector('.lightbox-close').addEventListener('click', closeLightbox);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !overlay.hidden) closeLightbox();
+    });
+  }
+  const content = overlay.querySelector('.lightbox-content');
+  content.innerHTML = mediaType === 'video'
+    ? `<video src="${url}" controls autoplay playsinline></video>`
+    : `<img src="${url}" alt="">`;
+  overlay.querySelector('.lightbox-caption').textContent = caption || '';
+  overlay.hidden = false;
+}
+
+function closeLightbox() {
+  const overlay = document.getElementById('lightboxOverlay');
+  if (!overlay) return;
+  overlay.hidden = true;
+  overlay.querySelector('.lightbox-content').innerHTML = ''; // stop any playing video
+}
+
 // Customer-facing pages call this once on load. If a stylist happens to be
 // logged in on this browser, it adds a "My dashboard" link to the nav so
 // they can get back to their admin screens. Otherwise it leaves an optional

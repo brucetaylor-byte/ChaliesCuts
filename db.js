@@ -105,6 +105,7 @@ ensureColumn('hairdressers', 'contact_email', "TEXT DEFAULT ''");
 ensureColumn('bookings', 'customer_phone', "TEXT DEFAULT ''");
 ensureColumn('bookings', 'paid', 'INTEGER DEFAULT 0');
 ensureColumn('availability_slots', 'block_id', 'INTEGER');
+ensureColumn('gallery_photos', 'media_type', "TEXT DEFAULT 'photo'"); // 'photo' | 'video'
 
 // One-time backfill: availability_slots created before the "blocks" feature
 // existed have no block_id, so they'd be invisible in the "Active blocks"

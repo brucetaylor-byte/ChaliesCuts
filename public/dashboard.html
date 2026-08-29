@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stylist Dashboard</title>
-<link rel="stylesheet" href="/css/style.css?v=14">
+<link rel="stylesheet" href="/css/style.css?v=15">
 </head>
 <body class="has-bottom-nav">
 <header class="site">
@@ -111,10 +111,10 @@
     </div>
 
     <div class="card">
-      <h2>Gallery - upload a photo</h2>
+      <h2>Gallery - upload a photo or video</h2>
       <form id="galleryForm">
-        <label for="photo">Photo</label>
-        <input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required>
+        <label for="photo">Photo or video</label>
+        <input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime" required>
         <label for="caption">Caption (optional)</label>
         <input id="caption">
         <div style="margin-top:1rem;">
@@ -173,7 +173,7 @@
   <div class="modal-box" id="slotModalBox"></div>
 </div>
 
-<script src="/js/api.js?v=3"></script>
+<script src="/js/api.js?v=4"></script>
 <script>
 let me = null;
 let allHairdressers = [];
@@ -1091,7 +1091,7 @@ document.getElementById('galleryForm').addEventListener('submit', async (e) => {
   const fileInput = document.getElementById('photo');
   if (!fileInput.files[0]) return;
   const fd = new FormData();
-  fd.append('photo', fileInput.files[0]);
+  fd.append('media', fileInput.files[0]);
   fd.append('caption', document.getElementById('caption').value);
   try {
     await api('POST', '/api/gallery', fd);
@@ -1111,10 +1111,17 @@ async function loadMyGallery() {
     const photos = await api('GET', `/api/gallery?hairdresserId=${me.id}`);
     el.innerHTML = photos.map(p => `
       <div>
-        <img src="${p.url}" alt="${esc(p.caption)}">
+        <button type="button" class="gallery-thumb" data-url="${p.url}" data-type="${p.media_type}" data-caption="${esc(p.caption)}" aria-label="${p.media_type === 'video' ? 'Play video' : 'View larger photo'}">
+          ${p.media_type === 'video'
+            ? `<video src="${p.url}" muted playsinline preload="metadata"></video><span class="gallery-play-icon">&#9658;</span>`
+            : `<img src="${p.url}" alt="${esc(p.caption)}">`}
+        </button>
         <button class="secondary" data-del="${p.id}" style="width:100%; margin-top:0.3rem;">Delete</button>
       </div>
     `).join('');
+    el.querySelectorAll('.gallery-thumb').forEach(btn => {
+      btn.addEventListener('click', () => openLightbox(btn.dataset.url, btn.dataset.type, btn.dataset.caption));
+    });
     el.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
       if (!confirm('Delete this photo?')) return;
       await api('DELETE', `/api/gallery/${btn.dataset.del}`);
