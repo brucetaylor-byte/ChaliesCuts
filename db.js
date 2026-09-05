@@ -120,6 +120,7 @@ ensureColumn('hairdressers', 'is_active', 'INTEGER DEFAULT 1');
 ensureColumn('hairdressers', 'contact_email', "TEXT DEFAULT ''");
 ensureColumn('bookings', 'customer_phone', "TEXT DEFAULT ''");
 ensureColumn('bookings', 'paid', 'INTEGER DEFAULT 0');
+ensureColumn('bookings', 'reminder_sent_at', 'TEXT'); // set once the 24h-ahead reminder email goes out (see lib/reminders.js) - keeps it from being sent twice
 ensureColumn('availability_slots', 'block_id', 'INTEGER');
 ensureColumn('gallery_photos', 'media_type', "TEXT DEFAULT 'photo'"); // 'photo' | 'video'
 

@@ -159,12 +159,6 @@
         <p id="addStylistMsg"></p>
       </form>
     </div>
-
-    <div class="card">
-      <h2>Customer accounts</h2>
-      <p class="muted">Everyone who's created a customer account (not people who've only booked anonymously). Delete an account, or reset its password if they're locked out.</p>
-      <div id="customerManageList"><p class="muted">Loading...</p></div>
-    </div>
   </section>
 </main>
 
@@ -367,7 +361,6 @@ async function init() {
   document.getElementById('contactEmail').value = me.contact_email || '';
   if (me.is_admin) {
     document.getElementById('adminTabBtn').style.display = '';
-    loadCustomerManageList();
   }
 
   allHairdressers = await api('GET', '/api/hairdressers');
@@ -1056,63 +1049,6 @@ async function removeStylist(h, confirmCancelBookings) {
       alert(err.message);
     }
   }
-}
-
-// ---------- Admin: manage customer accounts ----------
-let allCustomers = [];
-
-async function loadCustomerManageList() {
-  const el = document.getElementById('customerManageList');
-  try {
-    allCustomers = await api('GET', '/api/auth/admin/customers');
-    renderCustomerManageList();
-  } catch (err) {
-    el.innerHTML = `<p class="error">${esc(err.message)}</p>`;
-  }
-}
-
-function renderCustomerManageList() {
-  const el = document.getElementById('customerManageList');
-  if (allCustomers.length === 0) {
-    el.innerHTML = '<p class="muted">No customer accounts yet.</p>';
-    return;
-  }
-  el.innerHTML = allCustomers.map(c => `
-    <div class="block-tile">
-      <div class="block-tile-info">
-        <strong>${esc(c.name)}</strong>
-        <span class="muted">${esc(c.email)}</span>
-      </div>
-      <div class="row" style="display:flex; gap:0.4rem; flex:0 0 auto;">
-        <button type="button" class="secondary" data-reset-customer="${c.id}" style="font-size:0.8rem; padding:0.35rem 0.6rem; flex:none;">Reset password</button>
-        <button type="button" class="secondary block-tile-remove" data-remove-customer="${c.id}">Delete</button>
-      </div>
-    </div>
-  `).join('');
-
-  el.querySelectorAll('[data-reset-customer]').forEach(btn => btn.addEventListener('click', async () => {
-    const c = allCustomers.find(x => x.id === Number(btn.dataset.resetCustomer));
-    const newPass = prompt(`New password for ${c.name} (6+ characters):`);
-    if (!newPass) return;
-    if (newPass.length < 6) { alert('Password must be at least 6 characters.'); return; }
-    try {
-      await api('POST', `/api/auth/admin/customers/${c.id}/reset-password`, { newPassword: newPass });
-      alert(`Password reset for ${c.name}.`);
-    } catch (err) {
-      alert(err.message);
-    }
-  }));
-  el.querySelectorAll('[data-remove-customer]').forEach(btn => btn.addEventListener('click', async () => {
-    const c = allCustomers.find(x => x.id === Number(btn.dataset.removeCustomer));
-    if (!confirm(`Delete the customer account for ${c.name} (${c.email})? Their past bookings are kept, just no longer linked to a login.`)) return;
-    try {
-      await api('DELETE', `/api/auth/admin/customers/${c.id}`);
-      allCustomers = allCustomers.filter(x => x.id !== c.id);
-      renderCustomerManageList();
-    } catch (err) {
-      alert(err.message);
-    }
-  }));
 }
 
 // Mirrors the server's own cap (see routes/gallery.js MAX_UPLOAD_BYTES) so an

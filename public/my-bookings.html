@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>My bookings</title>
+<title>Find my booking</title>
 <link rel="stylesheet" href="/css/style.css?v=15">
 </head>
 <body>
@@ -15,141 +15,19 @@
   </nav>
 </header>
 <main>
-  <h1>My bookings</h1>
-  <p class="muted">This is optional &mdash; you don't need an account to book. Create one here if you'd like all your bookings in one place instead of tracking separate links.</p>
-
-  <div id="authArea"></div>
-  <div id="bookingsArea"></div>
+  <h1>Find my booking</h1>
+  <!-- There's no customer account/login - every booking is anonymous, so
+       the only way to look one up is the private link sent by email at
+       booking time. This page just explains that rather than offering
+       anything to sign into. -->
+  <div class="card">
+    <p>There's no account to log into - when you request a booking, you're emailed a private link that shows its status and Charlie's contact details. Bookmark that link when you get it.</p>
+    <p class="muted">Can't find that email? Contact Charlie on 0493 032 545 and he can look up your booking for you.</p>
+  </div>
 </main>
 <footer class="site"><a href="/login.html" id="stylistFooterLink">Stylist login</a></footer>
 <script src="/js/api.js?v=4"></script>
 <script>
-let me = null;
-
-async function init() {
-  try {
-    me = await api('GET', '/api/auth/customer/me');
-    renderLoggedIn();
-    loadBookings();
-  } catch (e) {
-    renderLoggedOut();
-  }
-}
-
-function renderLoggedOut() {
-  document.getElementById('authArea').innerHTML = `
-    <div class="card">
-      <h2>Log in or create an account</h2>
-      <form id="loginForm">
-        <label for="loginEmail">Email</label>
-        <input id="loginEmail" type="email" required>
-        <label for="loginPassword">Password</label>
-        <input id="loginPassword" type="password" required>
-        <div class="row" style="margin-top:1rem;">
-          <button type="submit">Log in</button>
-        </div>
-        <p id="loginMsg"></p>
-      </form>
-      <hr style="border:none;border-top:1px solid var(--line);margin:1rem 0;">
-      <h3>New here?</h3>
-      <form id="signupForm">
-        <label for="signupName">Name</label>
-        <input id="signupName" required>
-        <label for="signupEmail">Email</label>
-        <input id="signupEmail" type="email" required>
-        <label for="signupPassword">Password</label>
-        <input id="signupPassword" type="password" required minlength="6">
-        <div class="row" style="margin-top:1rem;">
-          <button type="submit">Create account</button>
-        </div>
-        <p id="signupMsg"></p>
-      </form>
-    </div>
-  `;
-  document.getElementById('bookingsArea').innerHTML = '<p class="muted">Don\'t have an account? No worries - use the private link you were given when you booked instead.</p>';
-
-  document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const msg = document.getElementById('loginMsg');
-    try {
-      me = await api('POST', '/api/auth/customer/login', {
-        email: document.getElementById('loginEmail').value,
-        password: document.getElementById('loginPassword').value
-      });
-      renderLoggedIn();
-      loadBookings();
-    } catch (err) {
-      msg.textContent = err.message;
-      msg.className = 'error';
-    }
-  });
-
-  document.getElementById('signupForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const msg = document.getElementById('signupMsg');
-    try {
-      me = await api('POST', '/api/auth/customer/signup', {
-        name: document.getElementById('signupName').value,
-        email: document.getElementById('signupEmail').value,
-        password: document.getElementById('signupPassword').value
-      });
-      renderLoggedIn();
-      loadBookings();
-    } catch (err) {
-      msg.textContent = err.message;
-      msg.className = 'error';
-    }
-  });
-}
-
-function renderLoggedIn() {
-  document.getElementById('authArea').innerHTML = `
-    <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-      <span>Logged in as <strong>${esc(me.name)}</strong></span>
-      <button class="secondary" id="logoutBtn">Log out</button>
-    </div>
-  `;
-  document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await api('POST', '/api/auth/customer/logout');
-    me = null;
-    renderLoggedOut();
-    document.getElementById('bookingsArea').innerHTML = '';
-  });
-}
-
-// Read-only - bookings can no longer be cancelled or changed online. Any
-// change has to go through Charlie directly, ideally at least 24 hours out,
-// same as the booking-confirmation email says.
-async function loadBookings() {
-  const el = document.getElementById('bookingsArea');
-  try {
-    const bookings = await api('GET', '/api/bookings/mine');
-    if (bookings.length === 0) {
-      el.innerHTML = '<p class="muted">No bookings yet.</p>';
-      return;
-    }
-    el.innerHTML = bookings.map(b => {
-      const isActive = b.status === 'pending' || b.status === 'approved';
-      return `
-      <div class="card">
-        <div><span class="badge ${b.status}">${b.status}</span></div>
-        <p><strong>${esc(b.hairdresser.display_name)}</strong> &mdash; ${fmtDate(b.slot.date)} at ${fmtTime(b.slot.start_time)}</p>
-        ${isActive ? `<p class="muted">Need to make a change? Contact Charlie on 0493 032 545 if you need to make any change to your appointment, ideally at least 24 hours before.</p>` : ''}
-      </div>
-    `;
-    }).join('');
-  } catch (e) {
-    el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
-  }
-}
-
-function esc(str) {
-  const div = document.createElement('div');
-  div.textContent = str || '';
-  return div.innerHTML;
-}
-
-init();
 initStylistLoginState('stylistFooterLink');
 </script>
 </body>

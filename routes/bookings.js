@@ -87,18 +87,13 @@ function isValidAuMobile(phone) {
   return /^(?:0|\+?61)4\d{8}$/.test(digitsAndPlus);
 }
 
-// Customer (anonymous or logged in): request a booking for an open slot.
+// Customer: request a booking for an open slot. There are no customer
+// accounts - every booking is anonymous, identified only by the name/email/
+// phone given on the form, plus the private access_token link emailed back.
 router.post('/', (req, res) => {
   const { slotId, customerName, customerEmail, customerPhone, note } = req.body || {};
-
-  let name = customerName;
-  let email = customerEmail;
-  let customerId = null;
-
-  if (req.session.customerId) {
-    const c = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.session.customerId);
-    if (c) { customerId = c.id; name = name || c.name; email = email || c.email; }
-  }
+  const name = customerName;
+  const email = customerEmail;
 
   if (!slotId || !name || !email) {
     return res.status(400).json({ error: 'slotId, customerName and customerEmail are required' });
@@ -121,9 +116,9 @@ router.post('/', (req, res) => {
 
   const accessToken = nanoid(24);
   const info = db.prepare(`
-    INSERT INTO bookings (slot_id, hairdresser_id, customer_id, customer_name, customer_email, customer_phone, status, access_token, note)
-    VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-  `).run(slotId, slot.hairdresser_id, customerId, name.trim(), email.trim().toLowerCase(), (customerPhone || '').trim(), accessToken, note || '');
+    INSERT INTO bookings (slot_id, hairdresser_id, customer_name, customer_email, customer_phone, status, access_token, note)
+    VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+  `).run(slotId, slot.hairdresser_id, name.trim(), email.trim().toLowerCase(), (customerPhone || '').trim(), accessToken, note || '');
 
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(info.lastInsertRowid);
   notifyStylistOfNewRequest(req, booking);
@@ -135,13 +130,6 @@ router.get('/token/:token', (req, res) => {
   const booking = db.prepare('SELECT * FROM bookings WHERE access_token = ?').get(req.params.token);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
   res.json(bookingWithSlot(booking));
-});
-
-// Logged-in customer: list their own bookings.
-router.get('/mine', (req, res) => {
-  if (!req.session.customerId) return res.status(401).json({ error: 'Not logged in' });
-  const rows = db.prepare('SELECT * FROM bookings WHERE customer_id = ? ORDER BY created_at DESC').all(req.session.customerId);
-  res.json(rows.map(bookingWithSlot));
 });
 
 // Cancel a booking - hairdresser only (e.g. cancelling a phone booking, or

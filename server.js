@@ -42,6 +42,10 @@ app.use('/api/gallery', require('./routes/gallery'));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
+// Periodically emails customers a reminder ~24 hours before their approved
+// appointment. See lib/reminders.js.
+require('./lib/reminders').startReminderScheduler();
+
 const server = app.listen(PORT, () => {
   console.log(`Haircut booking app listening on http://localhost:${PORT}`);
 });
