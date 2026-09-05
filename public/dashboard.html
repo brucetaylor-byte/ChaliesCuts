@@ -403,16 +403,40 @@ async function loadUpcomingBookings() {
         <div>${contactLine(b)}</div>
         ${b.note ? `<div class="muted">Note: ${esc(b.note)}</div>` : ''}
         ${b.status === 'approved' ? `
-          <label style="display:flex; align-items:center; gap:0.4rem; margin-top:0.5rem; cursor:pointer;">
-            <input type="checkbox" data-paid="${b.id}" ${b.paid ? 'checked' : ''}>
-            <span class="muted">Paid</span>
-          </label>
+          <div class="row" style="margin-top:0.5rem; justify-content:space-between; align-items:center;">
+            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+              <input type="checkbox" data-paid="${b.id}" ${b.paid ? 'checked' : ''}>
+              <span class="muted">Paid</span>
+            </label>
+            <button class="danger" data-cancel="${b.id}">Cancel</button>
+          </div>
         ` : ''}
       </div>
     `).join('');
     el.querySelectorAll('[data-paid]').forEach(cb => cb.addEventListener('change', () => togglePaid(cb)));
+    el.querySelectorAll('[data-cancel]').forEach(btn => btn.addEventListener('click', async () => {
+      const cancelled = await cancelBookingWithReopenChoice(btn.dataset.cancel);
+      if (cancelled) refreshAfterSlotChange();
+    }));
   } catch (e) {
     el.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+// Cancels a booking, then lets the stylist decide separately whether that
+// time should go straight back up for other customers to book, or stay
+// blocked off (the slot's about to pass anyway, he wants that time for
+// something else, etc). Shared by the Upcoming bookings list and the
+// calendar's slot modal so "Cancel" behaves the same everywhere.
+async function cancelBookingWithReopenChoice(bookingId) {
+  if (!confirm('Cancel this booking?')) return false;
+  const reopenSlot = confirm('Reopen this slot so other customers can book it?');
+  try {
+    await api('POST', '/api/bookings/cancel', { bookingId, reopenSlot });
+    return true;
+  } catch (e) {
+    alert(e.message);
+    return false;
   }
 }
 
@@ -835,7 +859,7 @@ async function openSlotModal(slotId, status, date, startTime) {
         actions.push(`<button data-modal-approve="${b.id}">Approve</button>`);
         actions.push(`<button class="danger" data-modal-decline="${b.id}">Decline</button>`);
       } else if (b.status === 'approved') {
-        actions.push(`<button class="danger" data-modal-cancelbooking="${b.id}">Cancel booking</button>`);
+        actions.push(`<button class="danger" data-modal-cancelbooking="${b.id}">Cancel</button>`);
       }
       box.innerHTML = `
         <h3>${whenLabel}</h3>
@@ -875,12 +899,11 @@ async function openSlotModal(slotId, status, date, startTime) {
       });
       const cancelBookingBtn = box.querySelector('[data-modal-cancelbooking]');
       if (cancelBookingBtn) cancelBookingBtn.addEventListener('click', async () => {
-        if (!confirm('Cancel this booking? The slot will reopen.')) return;
-        try {
-          await api('POST', '/api/bookings/cancel', { bookingId: b.id });
+        const cancelled = await cancelBookingWithReopenChoice(b.id);
+        if (cancelled) {
           closeSlotModal();
           refreshAfterSlotChange();
-        } catch (err) { alert(err.message); }
+        }
       });
     } catch (e) {
       box.innerHTML = `<h3>${whenLabel}</h3><p class="error">${esc(e.message)}</p><button type="button" class="secondary" id="modalCancelBtn">Close</button>`;

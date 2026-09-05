@@ -149,17 +149,27 @@ router.get('/mine', (req, res) => {
 // cannot cancel online themselves any more: the booking-confirmation email
 // points them to call Charlie directly instead, ideally 24 hours ahead, so
 // every cancellation goes through a real conversation rather than a click.
+//
+// Reopening the freed-up slot is a separate choice (reopenSlot), not an
+// automatic side effect - sometimes that time should go straight back up
+// for other customers, other times Charlie wants to just block it off
+// (the slot's about to pass anyway, he's taking that time for something
+// else, etc). Defaults to true so anything that doesn't pass it explicitly
+// keeps the old always-reopen behaviour.
 router.post('/cancel', requireHairdresser, (req, res) => {
-  const { bookingId } = req.body || {};
+  const { bookingId, reopenSlot } = req.body || {};
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ? AND hairdresser_id = ?').get(bookingId, req.session.hairdresserId);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
   if (booking.status === 'cancelled' || booking.status === 'declined') {
     return res.status(409).json({ error: 'This booking is already ' + booking.status });
   }
 
+  const shouldReopen = reopenSlot !== false;
   const runAll = db.transaction(() => {
     db.prepare(`UPDATE bookings SET status = 'cancelled', cancelled_at = datetime('now') WHERE id = ?`).run(booking.id);
-    db.prepare(`UPDATE availability_slots SET status = 'open' WHERE id = ?`).run(booking.slot_id);
+    if (shouldReopen) {
+      db.prepare(`UPDATE availability_slots SET status = 'open' WHERE id = ?`).run(booking.slot_id);
+    }
   });
   runAll();
 
