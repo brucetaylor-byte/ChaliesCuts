@@ -76,6 +76,9 @@
         <input id="displayName" required>
         <label for="bio">Bio</label>
         <textarea id="bio" rows="2"></textarea>
+        <label for="phone">Phone number (optional)</label>
+        <input id="phone" type="tel" placeholder="0412 345 678">
+        <p class="muted" style="margin-top:-0.5rem;">Shown publicly on your profile page, so customers can call you directly. Leave blank to not show one.</p>
         <label for="instagram">Instagram URL</label>
         <input id="instagram" placeholder="https://instagram.com/...">
         <label for="facebook">Facebook URL</label>
@@ -353,6 +356,7 @@ async function init() {
   document.getElementById('welcome').textContent = `Hi ${me.display_name}`;
   document.getElementById('displayName').value = me.display_name;
   document.getElementById('bio').value = me.bio || '';
+  document.getElementById('phone').value = me.phone || '';
   document.getElementById('instagram').value = me.instagram_url || '';
   document.getElementById('facebook').value = me.facebook_url || '';
   document.getElementById('tiktok').value = me.tiktok_url || '';
@@ -932,6 +936,7 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
     await api('PUT', '/api/hairdressers/me', {
       display_name: document.getElementById('displayName').value,
       bio: document.getElementById('bio').value,
+      phone: document.getElementById('phone').value,
       instagram_url: document.getElementById('instagram').value,
       facebook_url: document.getElementById('facebook').value,
       tiktok_url: document.getElementById('tiktok').value,

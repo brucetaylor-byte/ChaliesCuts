@@ -118,6 +118,7 @@ ensureColumn('hairdressers', 'snapchat_url', "TEXT DEFAULT ''");
 ensureColumn('hairdressers', 'is_admin', 'INTEGER DEFAULT 0');
 ensureColumn('hairdressers', 'is_active', 'INTEGER DEFAULT 1');
 ensureColumn('hairdressers', 'contact_email', "TEXT DEFAULT ''");
+ensureColumn('hairdressers', 'phone', "TEXT DEFAULT ''"); // optional, public - shown on their profile page. Distinct from contact_email, which is private (just where new-booking-request notifications land).
 ensureColumn('bookings', 'customer_phone', "TEXT DEFAULT ''");
 ensureColumn('bookings', 'paid', 'INTEGER DEFAULT 0');
 ensureColumn('bookings', 'reminder_sent_at', 'TEXT'); // set once the 24h-ahead reminder email goes out (see lib/reminders.js) - keeps it from being sent twice

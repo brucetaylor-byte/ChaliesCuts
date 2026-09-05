@@ -12,7 +12,6 @@
   <nav class="site-nav">
     <a href="/">&larr; Back to stylists</a>
     <a href="/gallery.html">Gallery</a>
-    <a href="/my-bookings.html">Find my booking</a>
   </nav>
 </header>
 <main>
@@ -63,6 +62,7 @@ async function loadProfile() {
     profileEl.innerHTML = `
       <h1>${esc(hd.display_name)}</h1>
       <p>${esc(hd.bio || '')}</p>
+      ${hd.phone ? `<p class="muted">Phone: ${esc(hd.phone)}</p>` : ''}
       ${socials ? `<div class="socials">${socials}</div>` : ''}
     `;
   } catch (e) {
@@ -242,12 +242,10 @@ document.getElementById('form').addEventListener('submit', async (e) => {
     document.getElementById('bookingForm').style.display = 'none';
     const confirmation = document.getElementById('confirmation');
     confirmation.style.display = 'block';
-    const statusUrl = `${location.origin}/booking-status.html?token=${booking.access_token}`;
     confirmation.innerHTML = `
       <h3>Request sent!</h3>
       <p>Your slot on <strong>${fmtDate(selectedSlot.date)} at ${fmtTime(selectedSlot.start)}</strong> is now pending confirmation from the stylist.</p>
-      <p>Bookmark this link to check its status:</p>
-      <p><a href="${statusUrl}">${statusUrl}</a></p>
+      <p class="muted">You'll get an email confirming we've received your request, then another once it's approved. Contact Charlie on 0493 032 545 if you need anything before then.</p>
     `;
     loadSlots();
   } catch (e2) {

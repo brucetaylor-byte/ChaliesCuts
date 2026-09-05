@@ -34,7 +34,7 @@ approves or declines the request before it's locked in.
 - **Email notifications are optional and off by default.** Set up
   `RESEND_API_KEY` (see "Booking confirmation emails" below) to turn them
   on. Without that, status is still checked via the private link sent at
-  booking time, or by logging into a customer account.
+  booking time - there's no account to log into either way.
 - **Sessions are stored in server memory.** Fine for one small server/single
   process. If you ever run more than one server instance behind a load
   balancer, swap in a session store like `connect-sqlite3` or Redis.
@@ -103,12 +103,13 @@ directly.
 **As a customer:**
 1. Go to the homepage, pick a stylist, and click an open (green) half-hour
    slot.
-2. Enter your name and email (or log in/sign up first if you want your
-   bookings saved to an account) and submit the request.
-3. You'll get a private link to check the status or cancel - bookmark it, or
-   log into `/my-bookings.html` if you created an account.
-4. The stylist approves or declines from their dashboard; cancelling later
-   reopens the slot for someone else.
+2. Enter your name and email and submit the request - there are no customer
+   accounts to sign up for.
+3. You'll get a private link by email to check the status - bookmark it.
+   You'll also get a reminder email about 24 hours before the appointment.
+4. The stylist approves or declines from their dashboard. Any cancelling or
+   rescheduling after that goes through the stylist directly (by phone) -
+   there's no self-service cancel on the site.
 
 ## Hosting cheaply
 
@@ -177,11 +178,15 @@ server.js              Express app entry point
 db.js                   SQLite schema + connection
 seed.js                 Creates the two stylist logins
 routes/
-  auth.js               Stylist + customer login/signup/logout
+  auth.js               Stylist login/logout/password change (no customer accounts)
   hairdressers.js        Public profiles + profile editing
   availability.js        Slot generation, listing, deletion
   bookings.js             Request / approve / decline / cancel
   gallery.js              Photo upload/listing/deletion
+lib/
+  mailer.js              Sends email via Resend
+  emailFormat.js          Shared date/time formatting for emails
+  reminders.js            24-hours-ahead appointment reminder sweep
 public/                 Static frontend (plain HTML/CSS/JS, no build step)
 uploads/                Uploaded gallery photos
 data/                   SQLite database file (created on first run)

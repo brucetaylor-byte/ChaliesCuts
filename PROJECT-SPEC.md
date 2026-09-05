@@ -67,16 +67,25 @@ stylist's calendar read-only. Both use the same this-week/next-week/later
 week grouping as the availability and customer views, so the whole app is
 consistent about how it breaks up time.
 
-**Booking confirmation emails.** When a stylist approves a booking, the
-customer automatically receives an email confirming the date/time, the
-salon address (36 Wyralla Crescent, Gisborne, 3437), and a contact number
-for each stylist — so they know exactly where to go without having to ask.
+**Customer emails.** Beyond the confirmation email, this is the entire set
+of automated touchpoints with a customer once they've submitted a booking -
+there's no dashboard or account for them to check back on:
+
+1. *Request received* — sent the moment they submit a request, letting them
+   know it's awaiting the stylist's confirmation.
+2. *Confirmed* — sent when the stylist approves it, with the date/time and
+   the salon address (36 Wyralla Crescent, Gisborne, 3437) so they know
+   exactly where to go.
+3. *Reminder* — sent roughly 24 hours before the appointment (see
+   `lib/reminders.js`).
+
 Declined and cancelled bookings also trigger a short notification email.
-Emails are sent via Resend (a transactional email API, free for the volume
-this app will ever see) and are entirely optional — if no Resend API key is
-configured, the app runs exactly the same way but skips sending email;
-customers still get a private link to check their booking status at any
-time.
+Every one of these includes a line to contact Charlie by phone for any
+change or question — there's no self-service status link or login; if a
+customer wants to check on or change something, they call. Emails are sent
+via Resend (a transactional email API, free for the volume this app will
+ever see) and are entirely optional — if no Resend API key is configured,
+the app runs exactly the same way but skips sending email.
 
 **Decision: Resend over sending "from Gmail" directly.** The original plan
 was to send booking emails straight from a stylist's own Gmail account
@@ -103,10 +112,11 @@ Pending requests whose slot time has already passed also drop out of the
 "Pending requests" list automatically (nothing is deleted, they just stop
 demanding action once there's nothing left to confirm).
 
-**Accounts and privacy.** Customers can book anonymously — they get a
-private, unguessable link (not tied to a login) to check status or cancel
-later. Optionally, they can create a lightweight account (email + password)
-to see every booking they've made in one place at `/my-bookings.html`.
+**Accounts and privacy.** Customers book anonymously — there are no customer
+accounts at all. Each booking gets a private, unguessable link (not tied to
+a login) emailed to them to check its status, plus a reminder email about
+24 hours before the appointment. Cancelling or rescheduling after a booking
+is approved goes through the stylist directly (by phone), not the website.
 Stylist accounts are separate logins, seeded initially and then managed by
 each stylist (username, password, display name, bio, social links). The
 login usernames are `charlie` and `angus` — these aren't shown to
@@ -136,9 +146,6 @@ tab, hidden from everyone else, with three panels:
   above) and the stylist can update it themselves later from their own
   Profile tab. New stylists show up in the Active stylists list and the
   dashboard's calendar toggle immediately, no page reload needed.
-- *Customer accounts* — everyone who's created a customer login (not
-  people who've only booked anonymously), with "Reset password" and
-  "Delete" per account.
 
 Removing a stylist is a soft removal, not a hard delete: their account
 just stops being able to log in (any existing session is invalidated
@@ -148,9 +155,6 @@ bookings, availability history and gallery photos are all kept. If a
 removed stylist has upcoming pending/approved bookings, Charlie is asked
 to confirm first — confirming cancels those bookings and emails the
 affected customers the same cancellation notice used elsewhere in the app.
-Deleting a customer account is a genuine delete, but their past bookings
-stay intact (a booking already stores the customer's name/email directly,
-independent of whether their account still exists).
 
 The dashboard's calendar view ("My calendar" / other stylists) and the
 public homepage's stylist list both already scale to any number of active
@@ -189,21 +193,19 @@ own Profile tab after logging in for the first time.
 ## 5. Data model (SQLite)
 
 - **hairdressers** — one row per stylist: login credentials, display name,
-  bio, social links, a `contact_email` used as the destination for that
-  stylist's own new-booking-request notifications, an `is_admin` flag (only
-  ever set for Charlie), and an `is_active` flag used to soft-remove a
-  stylist without deleting their row or any of their linked data.
-- **customers** — optional accounts for people who choose to sign up rather
-  than book anonymously.
+  bio, social links, an optional public `phone` shown on their profile page,
+  a `contact_email` used as the destination for that stylist's own
+  new-booking-request notifications, an `is_admin` flag (only ever set for
+  Charlie), and an `is_active` flag used to soft-remove a stylist without
+  deleting their row or any of their linked data.
 - **availability_blocks** — the date range / days-of-week / time-window
   rules a stylist defines; each block expands into many individual slots.
 - **availability_slots** — one row per bookable 30-minute slot, with a
   status of `open`, `pending`, or `booked`, linked back to the block that
   generated it.
 - **bookings** — one row per booking request, with a status of `pending`,
-  `approved`, `declined`, or `cancelled`, the customer's details, a private
-  `access_token` for the no-login status link, and timestamps for when it
-  was decided/cancelled.
+  `approved`, `declined`, or `cancelled`, the customer's details, and
+  timestamps for when it was decided/cancelled/reminded.
 - **gallery_photos** — uploaded photo filenames/captions, scoped to the
   uploading stylist.
 
@@ -222,8 +224,9 @@ own Profile tab after logging in for the first time.
   artwork's own background, with content in a slightly off-white "surface"
   tone for tiles/cards so they still stand out subtly rather than blending
   completely into the page.
-- **IDs/tokens:** `nanoid` for the unguessable per-booking access tokens
-  used in status links.
+- **IDs/tokens:** `nanoid` generates an unguessable per-booking access token,
+  stored but not currently used anywhere customer-facing (there's no
+  self-service status link) - kept in case a future feature needs it.
 
 ## 7. Hosting and deployment
 

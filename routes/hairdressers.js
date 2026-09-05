@@ -30,7 +30,7 @@ function requireAdmin(req, res, next) {
 
 // is_admin is included so the dashboard's stylist-management list knows which
 // account can't be removed - it's not sensitive, just a boolean flag.
-const PUBLIC_FIELDS = 'id, username, display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url, is_admin';
+const PUBLIC_FIELDS = 'id, username, display_name, bio, phone, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url, is_admin';
 
 // Public: list active hairdressers so a customer can choose. A removed
 // stylist (is_active = 0) simply stops appearing here.
@@ -143,9 +143,9 @@ router.get('/:id', (req, res) => {
   res.json({ ...hd, is_admin: !!hd.is_admin });
 });
 
-// Logged-in hairdresser: update own profile / bio / socials / booking notification email
+// Logged-in hairdresser: update own profile / bio / socials / phone / booking notification email
 router.put('/me', requireHairdresser, (req, res) => {
-  const { display_name, bio, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url, contact_email } = req.body || {};
+  const { display_name, bio, phone, instagram_url, facebook_url, tiktok_url, snapchat_url, website_url, contact_email } = req.body || {};
   const current = db.prepare('SELECT * FROM hairdressers WHERE id = ?').get(req.session.hairdresserId);
 
   let normalizedContactEmail = current.contact_email;
@@ -157,10 +157,11 @@ router.put('/me', requireHairdresser, (req, res) => {
     normalizedContactEmail = trimmed;
   }
 
-  db.prepare(`UPDATE hairdressers SET display_name = ?, bio = ?, instagram_url = ?, facebook_url = ?, tiktok_url = ?, snapchat_url = ?, website_url = ?, contact_email = ? WHERE id = ?`)
+  db.prepare(`UPDATE hairdressers SET display_name = ?, bio = ?, phone = ?, instagram_url = ?, facebook_url = ?, tiktok_url = ?, snapchat_url = ?, website_url = ?, contact_email = ? WHERE id = ?`)
     .run(
       display_name ?? current.display_name,
       bio ?? current.bio,
+      (phone ?? current.phone ?? '').trim(),
       instagram_url ?? current.instagram_url,
       facebook_url ?? current.facebook_url,
       tiktok_url ?? current.tiktok_url,

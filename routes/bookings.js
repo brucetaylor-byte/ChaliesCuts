@@ -19,11 +19,13 @@ async function notifyBookingEmail(req, booking, kind) {
     if (!booking.customer_email || !booking.slot || !booking.hairdresser) return;
     const when = `${formatDateForEmail(booking.slot.date)} at ${formatTimeForEmail(booking.slot.start_time)}`;
     const stylist = booking.hairdresser.display_name;
-    const link = `${req.protocol}://${req.get('host')}/booking-status.html?token=${booking.access_token}`;
     let subject, text;
-    if (kind === 'approved') {
+    if (kind === 'requested') {
+      subject = `Booking request received - ${formatDateForEmail(booking.slot.date)}`;
+      text = `Hi ${booking.customer_name},\n\nThanks for your request - we've received your booking with ${stylist} for ${when} and it's awaiting confirmation. You'll get another email once it's confirmed.\n\n${VENUE_CONTACTS}\n\nCharlie's Cuts`;
+    } else if (kind === 'approved') {
       subject = `Booking confirmed - ${formatDateForEmail(booking.slot.date)}`;
-      text = `Hi ${booking.customer_name},\n\nThank you for your booking - your appointment with ${stylist} has been confirmed for ${when}.\n\nPlease be at:\n${VENUE_ADDRESS}\n\n${VENUE_CONTACTS}\n\nNeed to check the details? Use your booking link:\n${link}\n\nSee you then!\nCharlie's Cuts`;
+      text = `Hi ${booking.customer_name},\n\nThank you for your booking - your appointment with ${stylist} has been confirmed for ${when}.\n\nPlease be at:\n${VENUE_ADDRESS}\n\n${VENUE_CONTACTS}\n\nSee you then!\nCharlie's Cuts`;
     } else if (kind === 'declined') {
       subject = `About your booking request - ${formatDateForEmail(booking.slot.date)}`;
       text = `Hi ${booking.customer_name},\n\nSorry, ${stylist} isn't able to take your requested slot on ${when}. Head back to the app when you get a chance and pick another time that suits.\n\nCharlie's Cuts`;
@@ -89,7 +91,10 @@ function isValidAuMobile(phone) {
 
 // Customer: request a booking for an open slot. There are no customer
 // accounts - every booking is anonymous, identified only by the name/email/
-// phone given on the form, plus the private access_token link emailed back.
+// phone given on the form. From here the customer only ever hears from us
+// by email (request received, then confirmed, then a reminder the day
+// before) - if they need to check on or change anything in between, that
+// goes through calling the stylist directly, not a website login or link.
 router.post('/', (req, res) => {
   const { slotId, customerName, customerEmail, customerPhone, note } = req.body || {};
   const name = customerName;
@@ -121,15 +126,10 @@ router.post('/', (req, res) => {
   `).run(slotId, slot.hairdresser_id, name.trim(), email.trim().toLowerCase(), (customerPhone || '').trim(), accessToken, note || '');
 
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(info.lastInsertRowid);
+  const full = bookingWithSlot(booking);
   notifyStylistOfNewRequest(req, booking);
-  res.json(bookingWithSlot(booking));
-});
-
-// Anonymous status lookup / management via private link.
-router.get('/token/:token', (req, res) => {
-  const booking = db.prepare('SELECT * FROM bookings WHERE access_token = ?').get(req.params.token);
-  if (!booking) return res.status(404).json({ error: 'Booking not found' });
-  res.json(bookingWithSlot(booking));
+  notifyBookingEmail(req, full, 'requested');
+  res.json(full);
 });
 
 // Cancel a booking - hairdresser only (e.g. cancelling a phone booking, or
