@@ -1097,11 +1097,7 @@ function renderCustomerManageList() {
 // that just sits there for however long it takes to fail.
 const GALLERY_MAX_UPLOAD_BYTES = 300 * 1024 * 1024;
 
-// Plain fetch (via the api() helper) gives no way to show upload progress or
-// react to a connection dropping mid-transfer - both matter a lot for a
-// multi-hundred-MB video on mobile data, where "nothing visibly happening"
-// is exactly what made this look broken. XHR exposes both.
-document.getElementById('galleryForm').addEventListener('submit', (e) => {
+document.getElementById('galleryForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const msg = document.getElementById('galleryMsg');
   const fileInput = document.getElementById('photo');
@@ -1117,10 +1113,6 @@ document.getElementById('galleryForm').addEventListener('submit', (e) => {
     return;
   }
 
-  const fd = new FormData();
-  fd.append('media', file);
-  fd.append('caption', document.getElementById('caption').value);
-
   const uploadBtn = document.getElementById('galleryUploadBtn');
   const progressWrap = document.getElementById('galleryProgressWrap');
   const progressBar = document.getElementById('galleryProgressBar');
@@ -1129,44 +1121,84 @@ document.getElementById('galleryForm').addEventListener('submit', (e) => {
   uploadBtn.disabled = true;
   progressWrap.style.display = 'block';
   progressBar.style.width = '0%';
-  progressLabel.textContent = file.type.startsWith('video/') ? 'Uploading video - this can take a while on mobile data...' : 'Uploading...';
+  progressLabel.textContent = file.type.startsWith('video/') ? 'Uploading video...' : 'Uploading...';
 
-  const xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/gallery');
-  xhr.withCredentials = true;
-  xhr.upload.addEventListener('progress', (ev) => {
-    if (!ev.lengthComputable) return;
-    const pct = Math.round((ev.loaded / ev.total) * 100);
-    progressBar.style.width = pct + '%';
-    progressLabel.textContent = `Uploading... ${pct}%`;
-  });
-  xhr.addEventListener('load', () => {
-    uploadBtn.disabled = false;
-    progressWrap.style.display = 'none';
-    let data = null;
-    try { data = JSON.parse(xhr.responseText); } catch (err) { /* no body */ }
-    if (xhr.status >= 200 && xhr.status < 300) {
-      msg.textContent = 'Uploaded.';
-      msg.className = 'success';
-      document.getElementById('galleryForm').reset();
-      loadMyGallery();
-    } else {
-      msg.textContent = (data && data.error) || `Upload failed (${xhr.status})`;
-      msg.className = 'error';
-    }
-  });
-  xhr.addEventListener('error', () => {
-    uploadBtn.disabled = false;
-    progressWrap.style.display = 'none';
-    msg.textContent = 'Upload failed - the connection dropped partway through. Check your signal and try again, or try a smaller file.';
+  try {
+    await uploadGalleryFile(file, document.getElementById('caption').value, (pct) => {
+      progressBar.style.width = pct + '%';
+      progressLabel.textContent = `Uploading... ${pct}%`;
+    });
+    msg.textContent = 'Uploaded.';
+    msg.className = 'success';
+    document.getElementById('galleryForm').reset();
+    loadMyGallery();
+  } catch (err) {
+    msg.textContent = err.message || 'Upload failed - please try again.';
     msg.className = 'error';
-  });
-  xhr.addEventListener('abort', () => {
+  } finally {
     uploadBtn.disabled = false;
     progressWrap.style.display = 'none';
-  });
-  xhr.send(fd);
+  }
 });
+
+// Uploads a file in small pieces rather than as one big request. A single
+// large request was found to get cut off (a 504) by something in front of
+// the app - almost certainly Railway's own load balancer giving up on a
+// slow upload - well before either Railway's own 15-minute request limit or
+// our own server timeouts ever came into play. Splitting into small chunks
+// keeps every individual request quick, sidestepping whatever that shorter
+// limit turns out to be, rather than us needing to know its exact value.
+async function uploadGalleryFile(file, caption, onProgress) {
+  const init = await api('POST', '/api/gallery/upload/init', {
+    mimetype: file.type,
+    totalBytes: file.size,
+    filename: file.name,
+    caption
+  });
+  const { uploadId, chunkSize } = init;
+
+  let offset = 0;
+  let attempt = 0;
+  const maxAttempts = 5;
+  while (offset < file.size) {
+    const chunk = file.slice(offset, Math.min(offset + chunkSize, file.size));
+    try {
+      const result = await sendGalleryChunk(uploadId, chunk);
+      offset = result.receivedBytes; // trust the server's count, not our own arithmetic
+      attempt = 0;
+      onProgress(Math.round((offset / file.size) * 100));
+    } catch (err) {
+      attempt++;
+      if (attempt > maxAttempts) throw err;
+      // A chunk can succeed on the server even if we never see the
+      // response (the reply itself can drop on a flaky connection) -
+      // check what actually landed before resending anything, so a retry
+      // can't double up bytes that already made it.
+      offset = await getGalleryUploadStatus(uploadId);
+      await new Promise(r => setTimeout(r, 500 * attempt));
+    }
+  }
+
+  return api('POST', `/api/gallery/upload/${uploadId}/complete`);
+}
+
+async function sendGalleryChunk(uploadId, chunk) {
+  const res = await fetch(`/api/gallery/upload/${uploadId}/chunk`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: chunk
+  });
+  let data = null;
+  try { data = await res.json(); } catch (err) { /* no body */ }
+  if (!res.ok) throw new Error((data && data.error) || `Upload failed (${res.status})`);
+  return data;
+}
+
+async function getGalleryUploadStatus(uploadId) {
+  const status = await api('GET', `/api/gallery/upload/${uploadId}/status`);
+  return status.receivedBytes;
+}
 
 async function loadMyGallery() {
   const el = document.getElementById('myGallery');

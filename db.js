@@ -84,6 +84,22 @@ CREATE TABLE IF NOT EXISTS gallery_photos (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Tracks a gallery photo/video upload while it's still arriving in chunks
+-- (see routes/gallery.js). Rows are short-lived: deleted as soon as the
+-- upload completes, or swept up if it's abandoned partway through.
+CREATE TABLE IF NOT EXISTS gallery_uploads (
+  id TEXT PRIMARY KEY,
+  hairdresser_id INTEGER NOT NULL REFERENCES hairdressers(id) ON DELETE CASCADE,
+  mimetype TEXT NOT NULL,
+  media_type TEXT NOT NULL,
+  ext TEXT NOT NULL DEFAULT '',
+  caption TEXT DEFAULT '',
+  temp_filename TEXT NOT NULL,
+  total_bytes INTEGER NOT NULL,
+  received_bytes INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_slots_hairdresser_date ON availability_slots(hairdresser_id, date);
 CREATE INDEX IF NOT EXISTS idx_bookings_slot ON bookings(slot_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_customer ON bookings(customer_id);
