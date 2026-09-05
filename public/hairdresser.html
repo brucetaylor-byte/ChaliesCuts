@@ -255,7 +255,7 @@ document.getElementById('form').addEventListener('submit', async (e) => {
     confirmation.innerHTML = `
       <h3>Request sent!</h3>
       <p>Your slot on <strong>${fmtDate(selectedSlot.date)} at ${fmtTime(selectedSlot.start)}</strong> is now pending confirmation from the stylist.</p>
-      <p>Bookmark this link to check its status or cancel later:</p>
+      <p>Bookmark this link to check its status:</p>
       <p><a href="${statusUrl}">${statusUrl}</a></p>
     `;
     loadSlots();
