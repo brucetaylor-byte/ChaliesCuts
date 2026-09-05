@@ -42,6 +42,17 @@ app.use('/api/gallery', require('./routes/gallery'));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Haircut booking app listening on http://localhost:${PORT}`);
 });
+
+// Node's own defaults here (headersTimeout 60s, requestTimeout 5min) are
+// self-imposed limits well short of Railway's platform ceiling (15 minutes).
+// A slow mobile upload of a legitimately-sized gallery video can easily take
+// longer than 5 minutes to finish sending, so the default requestTimeout was
+// killing the connection mid-upload even though the file itself was within
+// the 300MB cap - the request just hadn't fully arrived yet. Raise both to
+// give slow uploads the same headroom Railway itself allows.
+server.requestTimeout = 15 * 60 * 1000; // 15 minutes - matches Railway's platform max
+server.headersTimeout = 14 * 60 * 1000; // must stay below requestTimeout
+server.keepAliveTimeout = 12 * 1000; // Node default (5s) is fine for most, bumped slightly for slow mobile round-trips

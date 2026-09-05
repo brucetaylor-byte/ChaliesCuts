@@ -85,10 +85,28 @@ function rejectOversized(req, res, next) {
   next();
 }
 
+// Tracks how much of the request body actually arrived before anything goes
+// wrong, and logs it if the client disconnects mid-upload. This doesn't fix
+// anything by itself, but a "connection dropped" error can mean a genuinely
+// flaky mobile connection OR a server-side problem (e.g. a disk write
+// failure on the upload volume) - without this we're guessing blind. Next
+// time this happens, the logs will show which one it was.
+function trackUploadProgress(req, res, next) {
+  req._uploadBytesReceived = 0;
+  req.on('data', (chunk) => { req._uploadBytesReceived += chunk.length; });
+  req.on('aborted', () => {
+    const total = req.headers['content-length'] || 'unknown';
+    console.warn(`[gallery upload] client connection dropped after ${req._uploadBytesReceived}/${total} bytes (hairdresser ${req.session.hairdresserId})`);
+  });
+  next();
+}
+
 // Hairdresser: upload a photo or video to their own gallery section
-router.post('/', requireHairdresser, rejectOversized, (req, res) => {
+router.post('/', requireHairdresser, rejectOversized, trackUploadProgress, (req, res) => {
   upload.single('media')(req, res, (err) => {
     if (err) {
+      const total = req.headers['content-length'] || 'unknown';
+      console.error(`[gallery upload] failed after ${req._uploadBytesReceived}/${total} bytes:`, err.code || err.message, err);
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({ error: `That file is too big (over ${MAX_UPLOAD_MB}MB). Photos: JPEG/PNG/WEBP/GIF. Videos: MP4/WEBM/MOV, up to ${MAX_UPLOAD_MB}MB - try trimming the clip or lowering its resolution first.` });
       }
