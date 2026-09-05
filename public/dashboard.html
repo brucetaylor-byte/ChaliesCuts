@@ -403,12 +403,12 @@ async function loadUpcomingBookings() {
         <div>${contactLine(b)}</div>
         ${b.note ? `<div class="muted">Note: ${esc(b.note)}</div>` : ''}
         ${b.status === 'approved' ? `
-          <div class="row" style="margin-top:0.5rem; justify-content:space-between; align-items:center;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem;">
+            <button class="danger" data-cancel="${b.id}">Cancel</button>
             <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
               <input type="checkbox" data-paid="${b.id}" ${b.paid ? 'checked' : ''}>
               <span class="muted">Paid</span>
             </label>
-            <button class="danger" data-cancel="${b.id}">Cancel</button>
           </div>
         ` : ''}
       </div>
