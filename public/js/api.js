@@ -38,6 +38,20 @@ function qs(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
+// A Date's own calendar date as YYYY-MM-DD, read from its LOCAL fields
+// (never UTC). Everyone using this app is in Australia, so the browser's
+// local timezone already is the salon's timezone - going through
+// toISOString() instead would convert to UTC and silently shift the date
+// backward by a day for a large chunk of every day (Australia sits 10-11
+// hours ahead of UTC), which is what was causing weeks to look like they
+// started a day (or more) too early.
+function toLocalDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function todayLocalStr() {
+  return toLocalDateStr(new Date());
+}
+
 // Accepts Australian mobile numbers in common written forms:
 //   0412 345 678 / 0412345678 / +61 412 345 678 / 61412345678
 // Spaces/dashes are ignored. Returns true for an empty string (field is optional).

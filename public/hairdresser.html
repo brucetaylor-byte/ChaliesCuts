@@ -74,12 +74,12 @@ async function loadProfile() {
 function startOfWeek(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back up to the Monday that starts this week
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 }
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 }
 
 function renderDayGroups(slots) {
@@ -144,7 +144,7 @@ const CUSTOMER_WEEKS_TO_SHOW = 4;
 async function loadSlots() {
   const container = document.getElementById('slots');
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocalStr();
     const allSlots = await api('GET', `/api/availability/hairdresser/${hairdresserId}?from=${today}`);
     // Customers only care about what they can actually book - pending/booked
     // slots are someone else's, so they're just noise here.

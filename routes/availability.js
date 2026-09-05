@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { melbourneToday } = require('../lib/emailFormat');
 
 const router = express.Router();
 
@@ -125,7 +126,7 @@ router.get('/hairdresser/:hairdresserId', (req, res) => {
 // range hasn't fully passed yet), in calendar order, for the "Active
 // blocks" management list.
 router.get('/blocks', requireHairdresser, (req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = melbourneToday();
   const rows = db.prepare(`
     SELECT * FROM availability_blocks
     WHERE hairdresser_id = ? AND end_date >= ?

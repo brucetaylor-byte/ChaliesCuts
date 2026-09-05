@@ -33,41 +33,21 @@ async function load() {
   }
 }
 
-// Bookings can only be cancelled online up to 24 hours before the slot -
-// mirrors the same cutoff the server enforces in POST /api/bookings/cancel.
-function hoursUntilSlot(b) {
-  return (new Date(`${b.slot.date}T${b.slot.start_time}:00`) - new Date()) / (1000 * 60 * 60);
-}
-
+// Read-only status - bookings can no longer be cancelled or changed online.
+// Any change (cancelling, rescheduling) has to go through Charlie directly,
+// ideally at least 24 hours out, same as the booking-confirmation email says.
 function render(b) {
   const el = document.getElementById('content');
   const isActive = b.status === 'pending' || b.status === 'approved';
-  const canCancel = isActive && hoursUntilSlot(b) >= 24;
-  const tooLateToCancel = isActive && !canCancel;
   el.innerHTML = `
     <div class="card">
       <div><span class="badge ${b.status}">${b.status}</span></div>
       <p><strong>${esc(b.hairdresser.display_name)}</strong> &mdash; ${fmtDate(b.slot.date)} at ${fmtTime(b.slot.start_time)}</p>
       <p class="muted">Booked as ${esc(b.customer_name)} (${esc(b.customer_email)})</p>
       ${b.note ? `<p class="muted">Note: ${esc(b.note)}</p>` : ''}
-      ${canCancel ? `<button class="danger" id="cancelBtn">Cancel booking</button>` : ''}
-      ${tooLateToCancel ? `<p class="muted">This is within 24 hours of your appointment, so it can't be cancelled online any more &mdash; call Charlie on 0493 032 545 if you need to.</p>` : ''}
-      <p id="msg"></p>
+      ${isActive ? `<p class="muted">Need to make a change? Contact Charlie on 0493 032 545 if you need to make any change to your appointment, ideally at least 24 hours before.</p>` : ''}
     </div>
   `;
-  const cancelBtn = document.getElementById('cancelBtn');
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', async () => {
-      if (!confirm('Cancel this booking?')) return;
-      try {
-        const updated = await api('POST', '/api/bookings/cancel', { token });
-        render(updated);
-      } catch (e) {
-        document.getElementById('msg').textContent = e.message;
-        document.getElementById('msg').className = 'error';
-      }
-    });
-  }
 }
 
 function esc(str) {

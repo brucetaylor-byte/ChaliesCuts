@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
 const bookingsRouter = require('./bookings');
+const { melbourneToday } = require('../lib/emailFormat');
 
 const router = express.Router();
 
@@ -105,7 +106,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
   if (!target || !target.is_active) return res.status(404).json({ error: 'Stylist not found' });
   if (target.is_admin) return res.status(400).json({ error: "Charlie's admin account can't be removed" });
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = melbourneToday();
   const upcoming = db.prepare(`
     SELECT bookings.* FROM bookings
     JOIN availability_slots ON availability_slots.id = bookings.slot_id

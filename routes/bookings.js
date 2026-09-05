@@ -2,14 +2,14 @@ const express = require('express');
 const { nanoid } = require('nanoid');
 const db = require('../db');
 const { sendMail } = require('../lib/mailer');
-const { formatDateForEmail, formatTimeForEmail } = require('../lib/emailFormat');
+const { formatDateForEmail, formatTimeForEmail, melbourneToday } = require('../lib/emailFormat');
 
 const router = express.Router();
 
 // Shared salon address/contact block, appended to booking-confirmed emails
 // so a customer knows exactly where to show up without having to ask.
 const VENUE_ADDRESS = '36 Wyralla Crescent\nGisborne, 3437';
-const VENUE_CONTACTS = 'Contact Charlie on 0493 032 545 for further details';
+const VENUE_CONTACTS = 'Contact Charlie on 0493 032 545 if you need to make any change to your appointment, ideally at least 24 hours before.';
 
 // Fire-and-forget booking status email. Never throws - a template or send
 // failure is logged and swallowed so it can never break the request that
@@ -23,7 +23,7 @@ async function notifyBookingEmail(req, booking, kind) {
     let subject, text;
     if (kind === 'approved') {
       subject = `Booking confirmed - ${formatDateForEmail(booking.slot.date)}`;
-      text = `Hi ${booking.customer_name},\n\nThank you for your booking - your appointment with ${stylist} has been confirmed for ${when}.\n\nPlease be at:\n${VENUE_ADDRESS}\n\n${VENUE_CONTACTS}\n\nNeed to check the details or cancel later? Use your booking link:\n${link}\n\nSee you then!\nCharlie's Cuts`;
+      text = `Hi ${booking.customer_name},\n\nThank you for your booking - your appointment with ${stylist} has been confirmed for ${when}.\n\nPlease be at:\n${VENUE_ADDRESS}\n\n${VENUE_CONTACTS}\n\nNeed to check the details? Use your booking link:\n${link}\n\nSee you then!\nCharlie's Cuts`;
     } else if (kind === 'declined') {
       subject = `About your booking request - ${formatDateForEmail(booking.slot.date)}`;
       text = `Hi ${booking.customer_name},\n\nSorry, ${stylist} isn't able to take your requested slot on ${when}. Head back to the app when you get a chance and pick another time that suits.\n\nCharlie's Cuts`;
@@ -58,26 +58,6 @@ async function notifyStylistOfNewRequest(req, booking) {
     await sendMail({ to: hd.contact_email, subject, text });
   } catch (err) {
     console.error('notifyStylistOfNewRequest failed:', err.message);
-  }
-}
-
-// Fire-and-forget: tells the stylist a customer has cancelled one of their
-// bookings, sent to whichever email Charlie set up for them (contact_email) -
-// so they notice a slot has reopened without having to keep the dashboard
-// open. Only fired for customer-initiated cancellations (see /cancel below) -
-// if the stylist cancelled it themselves they obviously already know. Same
-// swallow-errors behaviour as the other notification helpers.
-async function notifyStylistOfCancellation(req, booking) {
-  try {
-    if (!booking.slot || !booking.hairdresser) return;
-    const hd = db.prepare('SELECT display_name, contact_email FROM hairdressers WHERE id = ?').get(booking.hairdresser_id);
-    if (!hd || !hd.contact_email) return;
-    const when = `${formatDateForEmail(booking.slot.date)} at ${formatTimeForEmail(booking.slot.start_time)}`;
-    const subject = `Booking cancelled - ${formatDateForEmail(booking.slot.date)}`;
-    const text = `Hi ${hd.display_name},\n\n${booking.customer_name} has cancelled their ${when} booking, so that slot is open again.\n\nCharlie's Cuts`;
-    await sendMail({ to: hd.contact_email, subject, text });
-  } catch (err) {
-    console.error('notifyStylistOfCancellation failed:', err.message);
   }
 }
 
@@ -164,39 +144,17 @@ router.get('/mine', (req, res) => {
   res.json(rows.map(bookingWithSlot));
 });
 
-// Cancel a booking: as the logged-in customer who made it, via their private token,
-// or as the hairdresser it belongs to (e.g. cancelling a phone booking).
-router.post('/cancel', (req, res) => {
-  const { bookingId, token } = req.body || {};
-  let booking;
-  let cancelledByHairdresser = false;
-  if (token) {
-    booking = db.prepare('SELECT * FROM bookings WHERE access_token = ?').get(token);
-  } else if (bookingId && req.session.customerId) {
-    booking = db.prepare('SELECT * FROM bookings WHERE id = ? AND customer_id = ?').get(bookingId, req.session.customerId);
-  } else if (bookingId && req.session.hairdresserId) {
-    booking = db.prepare('SELECT * FROM bookings WHERE id = ? AND hairdresser_id = ?').get(bookingId, req.session.hairdresserId);
-    cancelledByHairdresser = true;
-  }
+// Cancel a booking - hairdresser only (e.g. cancelling a phone booking, or
+// actioning a customer's request that came in by phone/text). Customers
+// cannot cancel online themselves any more: the booking-confirmation email
+// points them to call Charlie directly instead, ideally 24 hours ahead, so
+// every cancellation goes through a real conversation rather than a click.
+router.post('/cancel', requireHairdresser, (req, res) => {
+  const { bookingId } = req.body || {};
+  const booking = db.prepare('SELECT * FROM bookings WHERE id = ? AND hairdresser_id = ?').get(bookingId, req.session.hairdresserId);
   if (!booking) return res.status(404).json({ error: 'Booking not found' });
   if (booking.status === 'cancelled' || booking.status === 'declined') {
     return res.status(409).json({ error: 'This booking is already ' + booking.status });
-  }
-
-  // Customers can only cancel online up to 24 hours before their slot -
-  // any closer than that and there's no realistic chance of the slot being
-  // rebooked, so it needs to go through Charlie directly instead. This
-  // doesn't apply when the stylist is the one cancelling (e.g. a phone
-  // booking they need to pull at short notice).
-  if (!cancelledByHairdresser) {
-    const slot = db.prepare('SELECT * FROM availability_slots WHERE id = ?').get(booking.slot_id);
-    if (slot) {
-      const slotStart = new Date(`${slot.date}T${slot.start_time}:00`);
-      const hoursUntilSlot = (slotStart - new Date()) / (1000 * 60 * 60);
-      if (hoursUntilSlot < 24) {
-        return res.status(409).json({ error: 'Bookings can only be cancelled online up to 24 hours beforehand. Please contact Charlie on 0493 032 545 if you need to cancel sooner.' });
-      }
-    }
   }
 
   const runAll = db.transaction(() => {
@@ -207,15 +165,7 @@ router.post('/cancel', (req, res) => {
 
   const updated = db.prepare('SELECT * FROM bookings WHERE id = ?').get(booking.id);
   const full = bookingWithSlot(updated);
-  // Only email the customer when the stylist cancelled it - if the customer
-  // cancelled it themselves they obviously already know. The other way
-  // round: only alert the stylist when the customer cancelled it - a slot
-  // just reopened that they'll want to know about.
-  if (cancelledByHairdresser) {
-    notifyBookingEmail(req, full, 'cancelled');
-  } else {
-    notifyStylistOfCancellation(req, full);
-  }
+  notifyBookingEmail(req, full, 'cancelled');
   res.json(full);
 });
 
@@ -290,7 +240,7 @@ router.get('/', requireHairdresser, (req, res) => {
   // alone (still queryable with no status filter) so nothing is lost, it
   // just stops demanding attention.
   if (status === 'pending') {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = melbourneToday();
     mapped = mapped.filter(b => !b.slot || b.slot.date >= today);
   }
   res.json(mapped);

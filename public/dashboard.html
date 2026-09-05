@@ -112,13 +112,20 @@
 
     <div class="card">
       <h2>Gallery - upload a photo or video</h2>
+      <p class="muted">Photos: JPEG, PNG, WEBP or GIF. Videos: MP4, WEBM or MOV, up to 300MB - a big or long video can take a while to upload on mobile data, so keep clips short where you can.</p>
       <form id="galleryForm">
         <label for="photo">Photo or video</label>
         <input id="photo" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime" required>
         <label for="caption">Caption (optional)</label>
         <input id="caption">
         <div style="margin-top:1rem;">
-          <button type="submit">Upload</button>
+          <button type="submit" id="galleryUploadBtn">Upload</button>
+        </div>
+        <div id="galleryProgressWrap" style="display:none; margin-top:0.6rem;">
+          <div style="background:var(--line); border-radius:999px; height:8px; overflow:hidden;">
+            <div id="galleryProgressBar" style="background:var(--open); height:100%; width:0%;"></div>
+          </div>
+          <p id="galleryProgressLabel" class="muted" style="margin-top:0.3rem;"></p>
         </div>
         <p id="galleryMsg"></p>
       </form>
@@ -378,7 +385,7 @@ async function loadUpcomingBookings() {
   const el = document.getElementById('upcomingBookings');
   try {
     const bookings = await api('GET', '/api/bookings');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocalStr();
     const relevant = bookings.filter(b =>
       (b.status === 'pending' || b.status === 'approved') && b.slot && b.slot.date >= today
     );
@@ -420,7 +427,7 @@ async function loadNeedsPayment() {
   const el = document.getElementById('needsPayment');
   try {
     const bookings = await api('GET', '/api/bookings');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocalStr();
     const unpaid = bookings.filter(b =>
       b.status === 'approved' && b.slot && b.slot.date < today && !b.paid
     );
@@ -531,7 +538,7 @@ let otherCalExpanded = { key: null };
 async function loadMyCalendar() {
   const el = document.getElementById('myCalendar');
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocalStr();
     const slots = await api('GET', `/api/availability/hairdresser/${me.id}?from=${today}`);
     renderCalendarWeeks('myCalendar', slots, true, myCalExpanded);
     renderWeeksList(slots);
@@ -559,7 +566,7 @@ function renderCalendarWeeks(containerId, slots, clickable, state) {
     return;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalStr();
   const thisWeekStart = startOfWeek(today);
 
   const weeks = [];
@@ -616,13 +623,13 @@ function renderCalendarWeeks(containerId, slots, clickable, state) {
 function startOfWeek(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back up to the Monday that starts this week
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 }
 
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 }
 
 // "Your availability" - always shows the same fixed run of "Week beginning
@@ -636,7 +643,7 @@ function renderWeeksList(slots) {
   const el = document.getElementById('availabilityWeeks');
   if (!el) return;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalStr();
   const thisWeekStart = startOfWeek(today);
 
   const weeks = [];
@@ -893,7 +900,7 @@ async function loadOtherCalendar(hdId) {
   }
   el.innerHTML = '<p class="muted">Loading...</p>';
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocalStr();
     const slots = await api('GET', `/api/availability/hairdresser/${other.id}?from=${today}`);
     renderCalendarWeeks('otherCalendar', slots, false, otherCalExpanded);
   } catch (e) {
@@ -1085,24 +1092,80 @@ function renderCustomerManageList() {
   }));
 }
 
-document.getElementById('galleryForm').addEventListener('submit', async (e) => {
+// Mirrors the server's own cap (see routes/gallery.js MAX_UPLOAD_BYTES) so an
+// oversized file is rejected instantly instead of starting a doomed upload
+// that just sits there for however long it takes to fail.
+const GALLERY_MAX_UPLOAD_BYTES = 300 * 1024 * 1024;
+
+// Plain fetch (via the api() helper) gives no way to show upload progress or
+// react to a connection dropping mid-transfer - both matter a lot for a
+// multi-hundred-MB video on mobile data, where "nothing visibly happening"
+// is exactly what made this look broken. XHR exposes both.
+document.getElementById('galleryForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const msg = document.getElementById('galleryMsg');
   const fileInput = document.getElementById('photo');
-  if (!fileInput.files[0]) return;
-  const fd = new FormData();
-  fd.append('media', fileInput.files[0]);
-  fd.append('caption', document.getElementById('caption').value);
-  try {
-    await api('POST', '/api/gallery', fd);
-    msg.textContent = 'Uploaded.';
-    msg.className = 'success';
-    e.target.reset();
-    loadMyGallery();
-  } catch (err) {
-    msg.textContent = err.message;
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  msg.textContent = '';
+  msg.className = '';
+
+  if (file.size > GALLERY_MAX_UPLOAD_BYTES) {
+    msg.textContent = `That file is ${(file.size / (1024 * 1024)).toFixed(0)}MB, which is over the 300MB limit - try trimming the clip or lowering its resolution first.`;
     msg.className = 'error';
+    return;
   }
+
+  const fd = new FormData();
+  fd.append('media', file);
+  fd.append('caption', document.getElementById('caption').value);
+
+  const uploadBtn = document.getElementById('galleryUploadBtn');
+  const progressWrap = document.getElementById('galleryProgressWrap');
+  const progressBar = document.getElementById('galleryProgressBar');
+  const progressLabel = document.getElementById('galleryProgressLabel');
+
+  uploadBtn.disabled = true;
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressLabel.textContent = file.type.startsWith('video/') ? 'Uploading video - this can take a while on mobile data...' : 'Uploading...';
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/gallery');
+  xhr.withCredentials = true;
+  xhr.upload.addEventListener('progress', (ev) => {
+    if (!ev.lengthComputable) return;
+    const pct = Math.round((ev.loaded / ev.total) * 100);
+    progressBar.style.width = pct + '%';
+    progressLabel.textContent = `Uploading... ${pct}%`;
+  });
+  xhr.addEventListener('load', () => {
+    uploadBtn.disabled = false;
+    progressWrap.style.display = 'none';
+    let data = null;
+    try { data = JSON.parse(xhr.responseText); } catch (err) { /* no body */ }
+    if (xhr.status >= 200 && xhr.status < 300) {
+      msg.textContent = 'Uploaded.';
+      msg.className = 'success';
+      document.getElementById('galleryForm').reset();
+      loadMyGallery();
+    } else {
+      msg.textContent = (data && data.error) || `Upload failed (${xhr.status})`;
+      msg.className = 'error';
+    }
+  });
+  xhr.addEventListener('error', () => {
+    uploadBtn.disabled = false;
+    progressWrap.style.display = 'none';
+    msg.textContent = 'Upload failed - the connection dropped partway through. Check your signal and try again, or try a smaller file.';
+    msg.className = 'error';
+  });
+  xhr.addEventListener('abort', () => {
+    uploadBtn.disabled = false;
+    progressWrap.style.display = 'none';
+  });
+  xhr.send(fd);
 });
 
 async function loadMyGallery() {

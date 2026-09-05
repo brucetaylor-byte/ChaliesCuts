@@ -18,8 +18,12 @@ const ALLOWED_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime
 
 // Videos need a lot more headroom than photos - this is a shared cap for
 // whichever file comes in (multer can't apply a different limit per mimetype
-// up front), sized for a short profile/gallery clip rather than a photo.
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+// up front). Phone video gets big fast (a minute of 1080p can easily be
+// 100-200MB), so this is sized for a short gallery/profile clip rather than
+// a photo. Railway's own edge network allows requests up to 15 minutes, so
+// even a full 300MB upload has plenty of headroom on a slow mobile connection.
+const MAX_UPLOAD_BYTES = 300 * 1024 * 1024;
+const MAX_UPLOAD_MB = Math.round(MAX_UPLOAD_BYTES / (1024 * 1024));
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
@@ -65,10 +69,31 @@ router.get('/', (req, res) => {
   res.json(rows.map(r => ({ ...r, url: `/uploads/${r.filename}` })));
 });
 
+// Reject an oversized upload immediately, before multer even starts reading
+// the file off the wire. Without this, a file bigger than the limit still
+// streams in until multer's own fileSize check trips mid-upload - at which
+// point it destroys the connection rather than sending a clean response, so
+// the browser just sees the request die with no useful error after however
+// long it took to get that far. Checking Content-Length up front means an
+// oversized file fails fast with a proper message instead of silently
+// hanging for however long the doomed upload takes.
+function rejectOversized(req, res, next) {
+  const contentLength = Number(req.headers['content-length']);
+  if (contentLength && contentLength > MAX_UPLOAD_BYTES) {
+    return res.status(413).json({ error: `That file is too big (over ${MAX_UPLOAD_MB}MB). Photos: JPEG/PNG/WEBP/GIF. Videos: MP4/WEBM/MOV, up to ${MAX_UPLOAD_MB}MB - try trimming the clip or lowering its resolution first.` });
+  }
+  next();
+}
+
 // Hairdresser: upload a photo or video to their own gallery section
-router.post('/', requireHairdresser, (req, res) => {
+router.post('/', requireHairdresser, rejectOversized, (req, res) => {
   upload.single('media')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: `That file is too big (over ${MAX_UPLOAD_MB}MB). Photos: JPEG/PNG/WEBP/GIF. Videos: MP4/WEBM/MOV, up to ${MAX_UPLOAD_MB}MB - try trimming the clip or lowering its resolution first.` });
+      }
+      return res.status(400).json({ error: err.message });
+    }
     if (!req.file) return res.status(400).json({ error: 'No photo or video uploaded' });
     const caption = (req.body && req.body.caption) || '';
     const mediaType = ALLOWED_VIDEO_TYPES.has(req.file.mimetype) ? 'video' : 'photo';
